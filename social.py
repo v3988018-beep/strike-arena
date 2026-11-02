@@ -2,21 +2,34 @@
 
 Каждый браузер получает профиль: ник, номер (#1234) и секретный ключ (token),
 который хранится у игрока в localStorage — по нему сервер узнаёт его при следующем входе.
-Профили лежат в data/profiles.json.
+Профили лежат в data/profiles.json, а на сервере в интернете — в базе данных Postgres
+(переменная DATABASE_URL): диск хостинга стирается при каждом перезапуске.
 
 Меню держит отдельное соединение /social: через него приходят заявки в друзья,
 кто из друзей в сети, приглашения в лобби и настройки лобби.
 """
 import asyncio
 import json
+import os
 import random
 import secrets
 import string
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiohttp import web, WSMsgType
 
 DATA_FILE = Path(__file__).parent / "data" / "profiles.json"
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DB_SAVE_DELAY = 3.0    # изменения копятся и пишутся в базу одной записью раз в несколько секунд
+
+
+def db_dsn(url):
+    """asyncpg понимает из параметров адреса только sslmode — остальные (например channel_binding
+    из адреса Neon) он принял бы за настройки сервера и не подключился бы."""
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k == "sslmode"]
+    return urlunsplit(parts._replace(query=urlencode(query)))
 MAX_FRIENDS = 100
 MAX_REQUESTS = 50
 
@@ -98,7 +111,13 @@ class Social:
         self.in_game = set()              # кто сейчас в игре
         self.lobbies = {}                 # код → лобби
         self.lobby_of = {}                # id игрока → код лобби
-        self.load()
+        # база данных (на хостинге): пул соединений, прочитана ли она, есть ли несохранённое
+        self.db = None
+        self.db_ok = False
+        self.dirty = False
+        self.flush_task = None
+        if not DATABASE_URL:
+            self.load()
 
     # ---------- хранение ----------
     def load(self):
@@ -106,6 +125,9 @@ class Social:
             data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             data = {}
+        self.apply(data)
+
+    def apply(self, data):
         for p in data.get("profiles", []):
             # опыт появился позже — старым профилям начисляем его за уже сделанные убийства и победы
             p["stats"].setdefault("xp", p["stats"].get("kills", 0) * 20 + p["stats"].get("wins", 0) * 100)
@@ -115,11 +137,73 @@ class Social:
             self.by_token[p["token"]] = p["id"]
 
     def save(self):
+        if DATABASE_URL:
+            # в базу пишем не на каждое изменение, а пачкой через несколько секунд
+            self.dirty = True
+            if self.db_ok and (self.flush_task is None or self.flush_task.done()):
+                self.flush_task = asyncio.get_running_loop().create_task(self.flush_later(DB_SAVE_DELAY))
+            return
         DATA_FILE.parent.mkdir(exist_ok=True)
         tmp = DATA_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps({"profiles": list(self.profiles.values())}, ensure_ascii=False),
                        encoding="utf-8")
         tmp.replace(DATA_FILE)  # сначала во временный файл — чтобы не испортить при сбое
+
+    # ---------- база данных (сервер в интернете) ----------
+    async def start(self, app=None):
+        """Запуск сервера: читаем все профили из базы. Если прочитать не удалось — в базу НИЧЕГО
+        не пишем (db_ok остаётся False), иначе пустой список профилей затёр бы настоящие."""
+        if not DATABASE_URL:
+            return
+        import asyncpg   # нужен только на хостинге
+        for attempt in range(5):
+            try:
+                # statement_cache_size=0 — чтобы работало и через пул соединений Neon (pgbouncer)
+                self.db = await asyncpg.create_pool(db_dsn(DATABASE_URL), min_size=1, max_size=2,
+                                                    statement_cache_size=0)
+                await self.db.execute("CREATE TABLE IF NOT EXISTS store "
+                                      "(key text PRIMARY KEY, data text NOT NULL, updated timestamptz DEFAULT now())")
+                row = await self.db.fetchrow("SELECT data FROM store WHERE key = 'profiles'")
+                self.apply(json.loads(row["data"]) if row else {})
+                self.db_ok = True
+                print(f"[база] профилей загружено: {len(self.profiles)}", flush=True)
+                if self.dirty:   # кто-то успел зайти, пока база просыпалась
+                    self.save()
+                return
+            except Exception as e:
+                print(f"[база] не удалось подключиться (попытка {attempt + 1}): {e!r}", flush=True)
+                if self.db:
+                    await self.db.close()
+                    self.db = None
+                await asyncio.sleep(3 * (attempt + 1))
+        print("[база] ВНИМАНИЕ: база недоступна — профили не будут сохраняться до перезапуска", flush=True)
+
+    async def flush_later(self, delay):
+        await asyncio.sleep(delay)
+        await self.flush()
+
+    async def flush(self):
+        """Записать все профили в базу одной строкой. Не получилось — попробуем позже ещё раз."""
+        if not (self.db_ok and self.dirty):
+            return
+        self.dirty = False
+        data = json.dumps({"profiles": list(self.profiles.values())}, ensure_ascii=False)
+        try:
+            await self.db.execute(
+                "INSERT INTO store (key, data, updated) VALUES ('profiles', $1, now()) "
+                "ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated = now()", data)
+        except Exception as e:
+            print(f"[база] ошибка сохранения, повтор через 10 с: {e!r}", flush=True)
+            self.dirty = True
+            self.flush_task = asyncio.get_running_loop().create_task(self.flush_later(10))
+
+    async def stop(self, app=None):
+        """Сервер выключается (обновление на хостинге): сразу дописываем всё несохранённое."""
+        if self.flush_task and not self.flush_task.done():
+            self.flush_task.cancel()
+        await self.flush()
+        if self.db:
+            await self.db.close()
 
     def new_profile(self, name):
         used = {p["tag"] for p in self.profiles.values()}

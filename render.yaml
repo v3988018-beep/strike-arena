@@ -11,3 +11,5 @@ services:
         value: 3.13.1
       - key: OWNER_KEY        # секретный ключ владельца для читов — Render придумает его сам
         generateValue: true
+      - key: DATABASE_URL     # адрес базы Neon для профилей — вставляется вручную в Environment
+        sync: false

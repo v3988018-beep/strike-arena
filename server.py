@@ -1396,6 +1396,8 @@ def main():
         # стандартный цикл Windows пишет ConnectionResetError, когда браузер обрывает соединение
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     app = web.Application(middlewares=[no_cache])
+    app.on_startup.append(social.start)    # на хостинге — прочитать профили из базы до первого игрока
+    app.on_shutdown.append(social.stop)    # выключение/обновление — дописать несохранённое
     app.router.add_get("/", index)
     app.router.add_get("/ws", ws_handler)
     app.router.add_get("/social", social.handler)
