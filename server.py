@@ -19,8 +19,11 @@ from aiohttp import web, WSMsgType
 from bots import World, BotBrain, BOT_NAMES, DIFFICULTY, DIFFICULTY_NAME, HEAR_DIST
 from grenades import (Nade, DroppedGun, segment_hits_sphere, HE_RADIUS, HE_DAMAGE, FLASH_RANGE,
                       SMOKE_RADIUS, SMOKE_TIME)
+import economy
 import social as social_mod
 from social import Social, rank_of
+
+GOLD = economy.REWARDS["game"]   # золото за убийство, помощь, раунд, MVP, матч
 
 # На хостинге (Render и т.п.) порт задаёт сам хостинг через переменную PORT — это и признак «сервер в интернете»
 HOSTED = "PORT" in os.environ
@@ -400,9 +403,15 @@ class Game:
                               awp_kills=int(weapon == "awp"), wallbangs=int(wallbang), jump_kills=int(jump), aces=ace,
                               noscopes=int(noscope))
                 self.award(attacker, 25 if head else 20, "хедшот" if head else "убийство")
+                if attacker.pid and not attacker.brain:   # золото и задания дня — считает сервер
+                    social.game_gold(attacker.pid, GOLD["kill"], "убийство")
+                    social.game_mission(attacker.pid, "kill", f"kill:{weapon}", head and "head",
+                                        jump and "jump", wallbang and "wallbang")
                 helper = assist and self.players.get(assist["id"])
                 if helper:
                     self.award(helper, 10, "помощь")
+                    if helper.pid and not helper.brain:
+                        social.game_gold(helper.pid, GOLD["assist"], "помощь")
             await self.give_money(attacker, KILL_REWARD.get(weapon, 300), "за убийство")
             await self.broadcast({
                 "type": "kill", "killer": attacker.name, "killerId": attacker.id,
@@ -1028,15 +1037,23 @@ class Game:
             mvp_info = {"id": mvp.id, "name": mvp.name, "team": mvp.team, "why": why, "kills": mvp.round_kills}
         for p in self.humans(winner) if winner else []:
             self.award(p, 15, "победа в раунде")
+            if p.pid:
+                social.game_gold(p.pid, GOLD["round"], "победа в раунде")
+                social.game_mission(p.pid, "round")
         if mvp:
             self.award(mvp, 25, "MVP")
             social.record(mvp.pid, mvps=1)
+            if mvp.pid and not mvp.brain:
+                social.game_gold(mvp.pid, GOLD["mvp"], "MVP")
+                social.game_mission(mvp.pid, "mvp")
         match_over = winner is not None and self.score[winner] >= self.rules["rounds"]
         await self.broadcast({"type": "roundEnd", "winner": winner, "reason": reason, "score": self.score, "mvp": mvp_info})
         if match_over:
             for p in self.humans():
                 social.record(p.pid, matches=1, wins=int(p.team == winner))
                 self.award(p, 100 if p.team == winner else 30, "победа в матче" if p.team == winner else "матч сыгран")
+                if p.pid and p.team == winner:
+                    social.game_gold(p.pid, GOLD["match"], "победа в матче")
             # лобби 1 на 1 — рейтинг
             elo = {}
             duelists = [p for p in self.humans() if p.pid]
@@ -1228,10 +1245,11 @@ async def ws_handler(request):
                 if data.get("knife") in KNIVES and social.kills(pid) >= KNIFE_UNLOCK[data["knife"]]:
                     player.knife = data["knife"]   # закрытый нож (мало убийств) — остаётся обычный
                 skins = data.get("skins")
-                if isinstance(skins, dict):  # только названия оружия и короткие id скинов
+                owned = set(social.wallet(pid)["owned"]) if pid in social.profiles else set()
+                if isinstance(skins, dict):  # только скины, которые у игрока на самом деле есть
                     player.skins = {k: v for k, v in skins.items()
                                     if k in (*GUNS, "knife", "agent_ct", "agent_t")
-                                    and isinstance(v, str) and len(v) <= 32}
+                                    and isinstance(v, str) and v in owned}
                 game.next_id += 1
                 game.spawn(player)
                 # в середине раунда новичок ждёт следующего

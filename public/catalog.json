@@ -1,0 +1,964 @@
+{
+ "_about": "Каталог скинов, кейсов и наград. Общий для игры (game.js) и сервера (economy.py).",
+ "rarity": {
+  "common": {
+   "name": "Обычный",
+   "color": "#b0c3d9",
+   "price": 150
+  },
+  "rare": {
+   "name": "Редкий",
+   "color": "#4b69ff",
+   "price": 400
+  },
+  "epic": {
+   "name": "Эпический",
+   "color": "#a94bff",
+   "price": 900
+  },
+  "legendary": {
+   "name": "Легендарный",
+   "color": "#eb4b4b",
+   "price": 2000
+  },
+  "knife": {
+   "name": "★ Особый",
+   "color": "#ffd700",
+   "price": 3500
+  }
+ },
+ "skins": [
+  {
+   "id": "ak_desert",
+   "weapon": "rifle",
+   "name": "Пустынный камуфляж",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#c2a676",
+     "#8f7550",
+     "#5e4b33",
+     "#d8c49a"
+    ]
+   }
+  },
+  {
+   "id": "ak_ice",
+   "weapon": "rifle",
+   "name": "Синий лёд",
+   "rarity": "rare",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#e8f6ff",
+     "#3a8fd8"
+    ],
+    "gloss": 0.8
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#cfe6f5"
+    ],
+    "gloss": 0.9,
+    "metal": true
+   }
+  },
+  {
+   "id": "ak_redline",
+   "weapon": "rifle",
+   "name": "Красная линия",
+   "rarity": "rare",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#141414",
+     "#c4161c"
+    ],
+    "gloss": 0.4
+   },
+   "b": {
+    "type": "carbon",
+    "colors": [
+     "#1a1a1a",
+     "#2a2a2a"
+    ]
+   }
+  },
+  {
+   "id": "ak_tiger",
+   "weapon": "rifle",
+   "name": "Тигр",
+   "rarity": "epic",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#f08a1c",
+     "#1a1208"
+    ],
+    "gloss": 0.5
+   }
+  },
+  {
+   "id": "ak_fire",
+   "weapon": "rifle",
+   "name": "Огненный змей",
+   "rarity": "legendary",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#ffd23f",
+     "#ff6a00",
+     "#b3001b"
+    ],
+    "gloss": 0.9
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#c9a227"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "awp_forest",
+   "weapon": "awp",
+   "name": "Лесной",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#4a5d36",
+     "#2f3b24",
+     "#6b7d48",
+     "#1f2918"
+    ]
+   }
+  },
+  {
+   "id": "awp_neon",
+   "weapon": "awp",
+   "name": "Неон",
+   "rarity": "rare",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#ff4fd8",
+     "#33e6ff"
+    ],
+    "gloss": 0.9
+   }
+  },
+  {
+   "id": "awp_asimov",
+   "weapon": "awp",
+   "name": "Азимов",
+   "rarity": "epic",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#f2f2f2",
+     "#e8442c",
+     "#1a1a1a"
+    ],
+    "gloss": 0.6
+   }
+  },
+  {
+   "id": "awp_dragon",
+   "weapon": "awp",
+   "name": "Драконья история",
+   "rarity": "legendary",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#2e8b57",
+     "#d4af37"
+    ],
+    "gloss": 0.8
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#d4af37"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "usp_city",
+   "weapon": "pistol",
+   "name": "Город",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#8a8d91",
+     "#5b5e62",
+     "#b4b7ba",
+     "#3c3e41"
+    ]
+   }
+  },
+  {
+   "id": "usp_noir",
+   "weapon": "pistol",
+   "name": "Неонуар",
+   "rarity": "rare",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#5b2a86",
+     "#14d0c4"
+    ],
+    "gloss": 0.8
+   }
+  },
+  {
+   "id": "usp_kill",
+   "weapon": "pistol",
+   "name": "Подтверждённое",
+   "rarity": "epic",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#d9d9d9",
+     "#b51d1d"
+    ],
+    "gloss": 0.6
+   },
+   "b": {
+    "type": "carbon",
+    "colors": [
+     "#1c1c1c",
+     "#303030"
+    ]
+   }
+  },
+  {
+   "id": "de_night",
+   "weapon": "deagle",
+   "name": "Ночь",
+   "rarity": "common",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#202226"
+    ],
+    "gloss": 0.3
+   }
+  },
+  {
+   "id": "de_web",
+   "weapon": "deagle",
+   "name": "Кровавая паутина",
+   "rarity": "epic",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#a3121c",
+     "#140405"
+    ],
+    "gloss": 0.7
+   }
+  },
+  {
+   "id": "de_gold",
+   "weapon": "deagle",
+   "name": "Золото",
+   "rarity": "legendary",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#e3b23c"
+    ],
+    "gloss": 1,
+    "metal": true
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#2a1d06"
+    ],
+    "gloss": 0.6
+   }
+  },
+  {
+   "id": "m4_urban",
+   "weapon": "m4",
+   "name": "Городской камуфляж",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#6f747a",
+     "#4a4e53",
+     "#9aa0a6",
+     "#2f3236"
+    ]
+   }
+  },
+  {
+   "id": "m4_cyber",
+   "weapon": "m4",
+   "name": "Киберпанк",
+   "rarity": "epic",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#1b0f3a",
+     "#00d2ff"
+    ],
+    "gloss": 0.8
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#ff2fd0"
+    ],
+    "gloss": 0.9
+   }
+  },
+  {
+   "id": "m4_howl",
+   "weapon": "m4",
+   "name": "Вой",
+   "rarity": "legendary",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#d1401c",
+     "#2a0d05"
+    ],
+    "gloss": 0.6
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#e8b04a"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "m4_night",
+   "weapon": "m4",
+   "name": "Ночной рейд",
+   "rarity": "rare",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#0f1a2e",
+     "#5b7a99"
+    ],
+    "gloss": 0.7
+   },
+   "b": {
+    "type": "carbon",
+    "colors": [
+     "#141414",
+     "#262626"
+    ]
+   }
+  },
+  {
+   "id": "smg_neon",
+   "weapon": "smg",
+   "name": "Неоновая волна",
+   "rarity": "epic",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#2b0a4f",
+     "#a238ff",
+     "#22e1ff"
+    ],
+    "gloss": 0.9
+   }
+  },
+  {
+   "id": "smg_fire",
+   "weapon": "smg",
+   "name": "Пожар",
+   "rarity": "legendary",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#ff7a1a",
+     "#1a0a02"
+    ],
+    "gloss": 0.6
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#c9a227"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "sg_chrome",
+   "weapon": "shotgun",
+   "name": "Хром",
+   "rarity": "rare",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#c7ccd2"
+    ],
+    "gloss": 1,
+    "metal": true
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#2a2d31"
+    ]
+   }
+  },
+  {
+   "id": "sg_flame",
+   "weapon": "shotgun",
+   "name": "Пламя",
+   "rarity": "legendary",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#ffe14d",
+     "#ff6a00",
+     "#a3001b"
+    ],
+    "gloss": 0.8
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#1a1a1a"
+    ]
+   }
+  },
+  {
+   "id": "smg_sand",
+   "weapon": "smg",
+   "name": "Песчаная буря",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#c9b48a",
+     "#a38c62",
+     "#e0d2b0",
+     "#7d6a48"
+    ]
+   }
+  },
+  {
+   "id": "smg_toxic",
+   "weapon": "smg",
+   "name": "Токсин",
+   "rarity": "rare",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#1d1d1d",
+     "#9cff2e"
+    ],
+    "gloss": 0.5
+   }
+  },
+  {
+   "id": "sg_hunter",
+   "weapon": "shotgun",
+   "name": "Охотник",
+   "rarity": "common",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#5a4630",
+     "#3a2d1f",
+     "#7a6040",
+     "#2a2016"
+    ]
+   }
+  },
+  {
+   "id": "sg_gold",
+   "weapon": "shotgun",
+   "name": "Золотая дробь",
+   "rarity": "epic",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#d9a53a"
+    ],
+    "gloss": 1,
+    "metal": true
+   },
+   "b": {
+    "type": "carbon",
+    "colors": [
+     "#1a1a1a",
+     "#2a2a2a"
+    ]
+   }
+  },
+  {
+   "id": "kn_damascus",
+   "weapon": "knife",
+   "name": "Дамасская сталь",
+   "rarity": "rare",
+   "a": {
+    "type": "damascus",
+    "colors": [
+     "#9aa1a8",
+     "#4d5257"
+    ],
+    "gloss": 0.9,
+    "metal": true
+   }
+  },
+  {
+   "id": "kn_ultra",
+   "weapon": "knife",
+   "name": "Ультрафиолет",
+   "rarity": "epic",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#3d1f5c"
+    ],
+    "gloss": 0.7
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#1c0f2b"
+    ]
+   }
+  },
+  {
+   "id": "kn_web",
+   "weapon": "knife",
+   "name": "Кровавая паутина",
+   "rarity": "knife",
+   "a": {
+    "type": "tiger",
+    "colors": [
+     "#9c0d17",
+     "#0d0203"
+    ],
+    "gloss": 0.8
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#140405"
+    ]
+   }
+  },
+  {
+   "id": "kn_fade",
+   "weapon": "knife",
+   "name": "Градиент",
+   "rarity": "knife",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#ffe14d",
+     "#ff5fa2",
+     "#7a3cff"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "kn_doppler",
+   "weapon": "knife",
+   "name": "Допплер",
+   "rarity": "knife",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#0b1d4f",
+     "#7b2cbf",
+     "#1fb5c9"
+    ],
+    "gloss": 1,
+    "metal": true
+   },
+   "b": {
+    "type": "solid",
+    "colors": [
+     "#111"
+    ]
+   }
+  },
+  {
+   "id": "kn_gold",
+   "weapon": "knife",
+   "name": "Золотой",
+   "rarity": "knife",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#ffcf40"
+    ],
+    "gloss": 1,
+    "metal": true
+   }
+  },
+  {
+   "id": "ag_swat",
+   "weapon": "agent_ct",
+   "name": "Штурмовик SWAT",
+   "rarity": "common",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#2a3a5c",
+     "#15181d"
+    ]
+   }
+  },
+  {
+   "id": "ag_seal",
+   "weapon": "agent_ct",
+   "name": "Морской котик",
+   "rarity": "rare",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#5b6a45",
+     "#3b452d",
+     "#7d8a5c",
+     "#2a3120"
+    ]
+   }
+  },
+  {
+   "id": "ag_fbi",
+   "weapon": "agent_ct",
+   "name": "Агент ФБР",
+   "rarity": "rare",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#111111",
+     "#ffd400"
+    ]
+   }
+  },
+  {
+   "id": "ag_arctic",
+   "weapon": "agent_ct",
+   "name": "Арктический отряд",
+   "rarity": "epic",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#e9eef1",
+     "#b9c4cc",
+     "#8d99a3",
+     "#ffffff"
+    ]
+   }
+  },
+  {
+   "id": "ag_cyber",
+   "weapon": "agent_ct",
+   "name": "Кибер-спецназ",
+   "rarity": "legendary",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#0d0f14",
+     "#00c8e0"
+    ]
+   }
+  },
+  {
+   "id": "ag_commander",
+   "weapon": "agent_ct",
+   "name": "Золотой командир",
+   "rarity": "knife",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#b3121b",
+     "#d9a53a",
+     "#ffe08a"
+    ]
+   }
+  },
+  {
+   "id": "ag_street",
+   "weapon": "agent_t",
+   "name": "Уличный",
+   "rarity": "common",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#5a5d63",
+     "#8e1b1b"
+    ]
+   }
+  },
+  {
+   "id": "ag_desert",
+   "weapon": "agent_t",
+   "name": "Пустынный",
+   "rarity": "common",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#d8c49a",
+     "#9b8559"
+    ]
+   }
+  },
+  {
+   "id": "ag_pirate",
+   "weapon": "agent_t",
+   "name": "Пират",
+   "rarity": "rare",
+   "a": {
+    "type": "stripes",
+    "colors": [
+     "#1c1c1c",
+     "#b3121b"
+    ]
+   }
+  },
+  {
+   "id": "ag_jungle",
+   "weapon": "agent_t",
+   "name": "Партизан",
+   "rarity": "epic",
+   "a": {
+    "type": "camo",
+    "colors": [
+     "#3d5a2a",
+     "#25381a",
+     "#5e7d3b",
+     "#1a2612"
+    ]
+   }
+  },
+  {
+   "id": "ag_skull",
+   "weapon": "agent_t",
+   "name": "Череп",
+   "rarity": "epic",
+   "a": {
+    "type": "gradient",
+    "colors": [
+     "#111111",
+     "#e8e4d8"
+    ]
+   }
+  },
+  {
+   "id": "ag_demon",
+   "weapon": "agent_t",
+   "name": "Демон",
+   "rarity": "legendary",
+   "a": {
+    "type": "fade",
+    "colors": [
+     "#140303",
+     "#a3121c",
+     "#ff3b1f"
+    ]
+   }
+  },
+  {
+   "id": "ag_gold",
+   "weapon": "agent_t",
+   "name": "Золотая маска",
+   "rarity": "knife",
+   "a": {
+    "type": "solid",
+    "colors": [
+     "#ffcf40"
+    ]
+   }
+  }
+ ],
+ "cases": [
+  {
+   "id": "weapon",
+   "name": "Оружейный кейс",
+   "icon": "📦",
+   "price": 300,
+   "note": "Скины на всё огнестрельное оружие",
+   "pool": "guns",
+   "weights": {
+    "common": 60,
+    "rare": 25,
+    "epic": 11,
+    "legendary": 4
+   }
+  },
+  {
+   "id": "knife",
+   "name": "Ножевой кейс",
+   "icon": "🔪",
+   "price": 900,
+   "note": "Всё подряд и шанс 15% на редкий нож",
+   "pool": "noagents",
+   "weights": {
+    "common": 35,
+    "rare": 30,
+    "epic": 15,
+    "legendary": 5,
+    "knife": 15
+   }
+  },
+  {
+   "id": "agent",
+   "name": "Кейс агентов",
+   "icon": "🕵️",
+   "price": 500,
+   "note": "Персонажи за спецназ и террористов",
+   "pool": "agents",
+   "weights": {
+    "common": 45,
+    "rare": 28,
+    "epic": 16,
+    "legendary": 8,
+    "knife": 3
+   }
+  }
+ ],
+ "missions": [
+  {
+   "id": "kills",
+   "icon": "🎯",
+   "text": "Убей {n} врагов",
+   "n": 12,
+   "gold": 150,
+   "ev": "kill"
+  },
+  {
+   "id": "head",
+   "icon": "💀",
+   "text": "{n} убийств в голову",
+   "n": 5,
+   "gold": 200,
+   "ev": "head"
+  },
+  {
+   "id": "rounds",
+   "icon": "🏆",
+   "text": "Выиграй {n} раундов",
+   "n": 5,
+   "gold": 150,
+   "ev": "round"
+  },
+  {
+   "id": "mvp",
+   "icon": "⭐",
+   "text": "Стань MVP {n} раза",
+   "n": 2,
+   "gold": 200,
+   "ev": "mvp"
+  },
+  {
+   "id": "awp",
+   "icon": "🔭",
+   "text": "{n} убийства с AWP",
+   "n": 3,
+   "gold": 250,
+   "ev": "kill:awp"
+  },
+  {
+   "id": "knife",
+   "icon": "🔪",
+   "text": "Убей врага ножом",
+   "n": 1,
+   "gold": 300,
+   "ev": "kill:knife"
+  },
+  {
+   "id": "smg",
+   "icon": "💨",
+   "text": "{n} убийств из MP5",
+   "n": 5,
+   "gold": 200,
+   "ev": "kill:smg"
+  },
+  {
+   "id": "shotgun",
+   "icon": "💥",
+   "text": "{n} убийства из дробовика",
+   "n": 4,
+   "gold": 200,
+   "ev": "kill:shotgun"
+  },
+  {
+   "id": "m4",
+   "icon": "🔫",
+   "text": "{n} убийств из M4",
+   "n": 6,
+   "gold": 200,
+   "ev": "kill:m4"
+  },
+  {
+   "id": "jump",
+   "icon": "🦘",
+   "text": "Убийство в прыжке",
+   "n": 1,
+   "gold": 250,
+   "ev": "jump"
+  },
+  {
+   "id": "wallbang",
+   "icon": "🧱",
+   "text": "{n} убийства сквозь стену",
+   "n": 2,
+   "gold": 250,
+   "ev": "wallbang"
+  }
+ ],
+ "rewards": {
+  "startGold": 1000,
+  "game": {
+   "kill": 2,
+   "assist": 1,
+   "round": 5,
+   "mvp": 10,
+   "match": 25
+  },
+  "dupeRefund": 0.3,
+  "daily": {
+   "base": 100,
+   "step": 50,
+   "max": 400
+  },
+  "level": {
+   "goldBase": 100,
+   "goldPerLevel": 25,
+   "weaponCaseEvery": 5,
+   "knifeCaseEvery": 10
+  }
+ },
+ "market": {
+  "fee": 0.1,
+  "minPrice": 10,
+  "maxPrice": 1000000,
+  "maxListings": 20,
+  "tradeLockHours": 24
+ },
+ "shopRarities": [
+  "common",
+  "rare"
+ ]
+}

@@ -895,65 +895,13 @@ function buildKnifeViewModel(type) {
   return g;
 }
 // ================== СКИНЫ ==================
-// Редкость: название и цвет (как в CS)
-const RARITY = {
-  common:    { name: 'Обычный',     color: '#b0c3d9', price: 150 },
-  rare:      { name: 'Редкий',      color: '#4b69ff', price: 400 },
-  epic:      { name: 'Эпический',   color: '#a94bff', price: 900 },
-  legendary: { name: 'Легендарный', color: '#eb4b4b', price: 2000 },
-  knife:     { name: '★ Особый',    color: '#ffd700', price: 3500 },
-};
-// Каталог скинов. a — основная окраска, b — дополнительная (металл, рукоять).
+// Каталог (редкости и цены, скины, кейсы, задания, награды) — в catalog.json: тот же файл читает сервер,
+// который считает золото и открывает кейсы. a — основная окраска, b — дополнительная (металл, рукоять).
 // Узоры: solid, gradient, camo, stripes, tiger, fade, carbon, damascus
-const SKINS = [
-  { id: 'ak_desert',   weapon: 'rifle',  name: 'Пустынный камуфляж', rarity: 'common',    a: { type: 'camo', colors: ['#c2a676', '#8f7550', '#5e4b33', '#d8c49a'] } },
-  { id: 'ak_ice',      weapon: 'rifle',  name: 'Синий лёд',          rarity: 'rare',      a: { type: 'gradient', colors: ['#e8f6ff', '#3a8fd8'], gloss: 0.8 }, b: { type: 'solid', colors: ['#cfe6f5'], gloss: 0.9, metal: true } },
-  { id: 'ak_redline',  weapon: 'rifle',  name: 'Красная линия',      rarity: 'rare',      a: { type: 'stripes', colors: ['#141414', '#c4161c'], gloss: 0.4 }, b: { type: 'carbon', colors: ['#1a1a1a', '#2a2a2a'] } },
-  { id: 'ak_tiger',    weapon: 'rifle',  name: 'Тигр',               rarity: 'epic',      a: { type: 'tiger', colors: ['#f08a1c', '#1a1208'], gloss: 0.5 } },
-  { id: 'ak_fire',     weapon: 'rifle',  name: 'Огненный змей',      rarity: 'legendary', a: { type: 'fade', colors: ['#ffd23f', '#ff6a00', '#b3001b'], gloss: 0.9 }, b: { type: 'solid', colors: ['#c9a227'], gloss: 1, metal: true } },
-  { id: 'awp_forest',  weapon: 'awp',    name: 'Лесной',             rarity: 'common',    a: { type: 'camo', colors: ['#4a5d36', '#2f3b24', '#6b7d48', '#1f2918'] } },
-  { id: 'awp_neon',    weapon: 'awp',    name: 'Неон',               rarity: 'rare',      a: { type: 'gradient', colors: ['#ff4fd8', '#33e6ff'], gloss: 0.9 } },
-  { id: 'awp_asimov',  weapon: 'awp',    name: 'Азимов',             rarity: 'epic',      a: { type: 'stripes', colors: ['#f2f2f2', '#e8442c', '#1a1a1a'], gloss: 0.6 } },
-  { id: 'awp_dragon',  weapon: 'awp',    name: 'Драконья история',   rarity: 'legendary', a: { type: 'tiger', colors: ['#2e8b57', '#d4af37'], gloss: 0.8 }, b: { type: 'solid', colors: ['#d4af37'], gloss: 1, metal: true } },
-  { id: 'usp_city',    weapon: 'pistol', name: 'Город',              rarity: 'common',    a: { type: 'camo', colors: ['#8a8d91', '#5b5e62', '#b4b7ba', '#3c3e41'] } },
-  { id: 'usp_noir',    weapon: 'pistol', name: 'Неонуар',            rarity: 'rare',      a: { type: 'gradient', colors: ['#5b2a86', '#14d0c4'], gloss: 0.8 } },
-  { id: 'usp_kill',    weapon: 'pistol', name: 'Подтверждённое',     rarity: 'epic',      a: { type: 'stripes', colors: ['#d9d9d9', '#b51d1d'], gloss: 0.6 }, b: { type: 'carbon', colors: ['#1c1c1c', '#303030'] } },
-  { id: 'de_night',    weapon: 'deagle', name: 'Ночь',               rarity: 'common',    a: { type: 'solid', colors: ['#202226'], gloss: 0.3 } },
-  { id: 'de_web',      weapon: 'deagle', name: 'Кровавая паутина',   rarity: 'epic',      a: { type: 'tiger', colors: ['#a3121c', '#140405'], gloss: 0.7 } },
-  { id: 'de_gold',     weapon: 'deagle', name: 'Золото',             rarity: 'legendary', a: { type: 'solid', colors: ['#e3b23c'], gloss: 1, metal: true }, b: { type: 'solid', colors: ['#2a1d06'], gloss: 0.6 } },
-  { id: 'm4_urban',    weapon: 'm4',     name: 'Городской камуфляж', rarity: 'common',    a: { type: 'camo', colors: ['#6f747a', '#4a4e53', '#9aa0a6', '#2f3236'] } },
-  { id: 'm4_cyber',    weapon: 'm4',     name: 'Киберпанк',          rarity: 'epic',      a: { type: 'gradient', colors: ['#1b0f3a', '#00d2ff'], gloss: 0.8 }, b: { type: 'solid', colors: ['#ff2fd0'], gloss: 0.9 } },
-  { id: 'm4_howl',     weapon: 'm4',     name: 'Вой',                rarity: 'legendary', a: { type: 'tiger', colors: ['#d1401c', '#2a0d05'], gloss: 0.6 }, b: { type: 'solid', colors: ['#e8b04a'], gloss: 1, metal: true } },
-  { id: 'm4_night',    weapon: 'm4',     name: 'Ночной рейд',        rarity: 'rare',      a: { type: 'gradient', colors: ['#0f1a2e', '#5b7a99'], gloss: 0.7 }, b: { type: 'carbon', colors: ['#141414', '#262626'] } },
-  { id: 'smg_neon',    weapon: 'smg',    name: 'Неоновая волна',     rarity: 'epic',      a: { type: 'fade', colors: ['#2b0a4f', '#a238ff', '#22e1ff'], gloss: 0.9 } },
-  { id: 'smg_fire',    weapon: 'smg',    name: 'Пожар',              rarity: 'legendary', a: { type: 'tiger', colors: ['#ff7a1a', '#1a0a02'], gloss: 0.6 }, b: { type: 'solid', colors: ['#c9a227'], gloss: 1, metal: true } },
-  { id: 'sg_chrome',   weapon: 'shotgun', name: 'Хром',              rarity: 'rare',      a: { type: 'solid', colors: ['#c7ccd2'], gloss: 1, metal: true }, b: { type: 'solid', colors: ['#2a2d31'] } },
-  { id: 'sg_flame',    weapon: 'shotgun', name: 'Пламя',             rarity: 'legendary', a: { type: 'fade', colors: ['#ffe14d', '#ff6a00', '#a3001b'], gloss: 0.8 }, b: { type: 'solid', colors: ['#1a1a1a'] } },
-  { id: 'smg_sand',    weapon: 'smg',    name: 'Песчаная буря',      rarity: 'common',    a: { type: 'camo', colors: ['#c9b48a', '#a38c62', '#e0d2b0', '#7d6a48'] } },
-  { id: 'smg_toxic',   weapon: 'smg',    name: 'Токсин',             rarity: 'rare',      a: { type: 'stripes', colors: ['#1d1d1d', '#9cff2e'], gloss: 0.5 } },
-  { id: 'sg_hunter',   weapon: 'shotgun', name: 'Охотник',           rarity: 'common',    a: { type: 'camo', colors: ['#5a4630', '#3a2d1f', '#7a6040', '#2a2016'] } },
-  { id: 'sg_gold',     weapon: 'shotgun', name: 'Золотая дробь',     rarity: 'epic',      a: { type: 'solid', colors: ['#d9a53a'], gloss: 1, metal: true }, b: { type: 'carbon', colors: ['#1a1a1a', '#2a2a2a'] } },
-  { id: 'kn_damascus', weapon: 'knife',  name: 'Дамасская сталь',    rarity: 'rare',      a: { type: 'damascus', colors: ['#9aa1a8', '#4d5257'], gloss: 0.9, metal: true } },
-  { id: 'kn_ultra',    weapon: 'knife',  name: 'Ультрафиолет',       rarity: 'epic',      a: { type: 'solid', colors: ['#3d1f5c'], gloss: 0.7 }, b: { type: 'solid', colors: ['#1c0f2b'] } },
-  { id: 'kn_web',      weapon: 'knife',  name: 'Кровавая паутина',   rarity: 'knife',     a: { type: 'tiger', colors: ['#9c0d17', '#0d0203'], gloss: 0.8 }, b: { type: 'solid', colors: ['#140405'] } },
-  { id: 'kn_fade',     weapon: 'knife',  name: 'Градиент',           rarity: 'knife',     a: { type: 'fade', colors: ['#ffe14d', '#ff5fa2', '#7a3cff'], gloss: 1, metal: true } },
-  { id: 'kn_doppler',  weapon: 'knife',  name: 'Допплер',            rarity: 'knife',     a: { type: 'fade', colors: ['#0b1d4f', '#7b2cbf', '#1fb5c9'], gloss: 1, metal: true }, b: { type: 'solid', colors: ['#111'] } },
-  { id: 'kn_gold',     weapon: 'knife',  name: 'Золотой',            rarity: 'knife',     a: { type: 'solid', colors: ['#ffcf40'], gloss: 1, metal: true } },
-  // Агенты — внешний вид персонажа (как он выглядит, задаёт AGENT_LOOKS); a — фон карточки
-  { id: 'ag_swat',      weapon: 'agent_ct', name: 'Штурмовик SWAT',    rarity: 'common',    a: { type: 'gradient', colors: ['#2a3a5c', '#15181d'] } },
-  { id: 'ag_seal',      weapon: 'agent_ct', name: 'Морской котик',     rarity: 'rare',      a: { type: 'camo', colors: ['#5b6a45', '#3b452d', '#7d8a5c', '#2a3120'] } },
-  { id: 'ag_fbi',       weapon: 'agent_ct', name: 'Агент ФБР',         rarity: 'rare',      a: { type: 'stripes', colors: ['#111111', '#ffd400'] } },
-  { id: 'ag_arctic',    weapon: 'agent_ct', name: 'Арктический отряд', rarity: 'epic',      a: { type: 'camo', colors: ['#e9eef1', '#b9c4cc', '#8d99a3', '#ffffff'] } },
-  { id: 'ag_cyber',     weapon: 'agent_ct', name: 'Кибер-спецназ',     rarity: 'legendary', a: { type: 'gradient', colors: ['#0d0f14', '#00c8e0'] } },
-  { id: 'ag_commander', weapon: 'agent_ct', name: 'Золотой командир',  rarity: 'knife',     a: { type: 'fade', colors: ['#b3121b', '#d9a53a', '#ffe08a'] } },
-  { id: 'ag_street',    weapon: 'agent_t',  name: 'Уличный',           rarity: 'common',    a: { type: 'gradient', colors: ['#5a5d63', '#8e1b1b'] } },
-  { id: 'ag_desert',    weapon: 'agent_t',  name: 'Пустынный',         rarity: 'common',    a: { type: 'gradient', colors: ['#d8c49a', '#9b8559'] } },
-  { id: 'ag_pirate',    weapon: 'agent_t',  name: 'Пират',             rarity: 'rare',      a: { type: 'stripes', colors: ['#1c1c1c', '#b3121b'] } },
-  { id: 'ag_jungle',    weapon: 'agent_t',  name: 'Партизан',          rarity: 'epic',      a: { type: 'camo', colors: ['#3d5a2a', '#25381a', '#5e7d3b', '#1a2612'] } },
-  { id: 'ag_skull',     weapon: 'agent_t',  name: 'Череп',             rarity: 'epic',      a: { type: 'gradient', colors: ['#111111', '#e8e4d8'] } },
-  { id: 'ag_demon',     weapon: 'agent_t',  name: 'Демон',             rarity: 'legendary', a: { type: 'fade', colors: ['#140303', '#a3121c', '#ff3b1f'] } },
-  { id: 'ag_gold',      weapon: 'agent_t',  name: 'Золотая маска',     rarity: 'knife',     a: { type: 'solid', colors: ['#ffcf40'] } },
-];
+const CATALOG = await (await fetch('catalog.json', { cache: 'no-store' })).json();
+const RARITY = CATALOG.rarity;
+const SHOP_RARITIES = new Set(CATALOG.shopRarities);   // что продаётся за золото; остальное — кейсы и рынок
+const SKINS = CATALOG.skins.map(s => ({ ...s }));
 const isAgent = s => s.weapon.startsWith('agent');
 // Окраски ножей выше — заготовки: каждая есть на каждом типе ножа отдельно ("kn_fade@karambit").
 // Скин работает только на своём ноже, а нож сначала надо открыть убийствами.
@@ -1058,30 +1006,20 @@ function applySkin(group, weapon, skinId) {
   group.traverse(o => { if (o.isMesh && swap.has(o.material)) o.material = swap.get(o.material); });
 }
 
-// Профиль игрока в браузере: золото, купленные и надетые скины
+// Кошелёк: золото, купленные и надетые скины. Считает его СЕРВЕР (economy.py) — здесь только копия для показа,
+// а покупка, кейс, награда — это просьба серверу (socialSend), ответ приходит новым кошельком.
 // knifeSkins — какой скин выбран на каждом типе ножа: { karambit: 'kn_fade@karambit', ... }
-// freeCases — бесплатные кейсы за уровни { weapon: 1, knife: 0 }; rewardLevel — за какой уровень уже выдана награда;
-// missions — задания дня { day, list: [{ id, p (прогресс), claimed }] }
-const wallet = { gold: 1000, owned: [], equipped: {}, knifeSkins: {}, freeCases: {}, rewardLevel: null, missions: null };  // 1000 золота — подарок на старт
-try { Object.assign(wallet, JSON.parse(localStorage.getItem('sa_profile') || '{}')); } catch {}
-// раньше скин ножа подходил к любому ножу — такие переносим на обычный нож
-const oldKnife = id => (KNIFE_FINISHES.some(f => f.id === id) ? `${id}@default` : id);
-wallet.owned = [...new Set(wallet.owned.map(oldKnife))].filter(id => SKIN_BY_ID[id]);
-for (const w in wallet.equipped) wallet.equipped[w] = oldKnife(wallet.equipped[w]);
-if (wallet.equipped.knife) wallet.knifeSkins[SKIN_BY_ID[wallet.equipped.knife]?.knife || 'default'] ??= wallet.equipped.knife;
-for (const [w, id] of Object.entries(wallet.equipped)) if (!wallet.owned.includes(id)) delete wallet.equipped[w];
-// rev — номер версии кошелька: растёт с каждым изменением, по нему видно, где копия новее — в браузере или на сервере
-function saveProfile(changed = true) {
-  if (changed) { wallet.rev = (wallet.rev || 0) + 1; scheduleWalletUpload(); }
-  try { localStorage.setItem('sa_profile', JSON.stringify(wallet)); } catch {}
+// freeCases — бесплатные кейсы за уровни; missions — задания дня { day, list: [{ id, p, claimed }] };
+// daily — награда дня { ready, amount, streak, tomorrow }; locked — какие скины пока нельзя продать на рынке
+const wallet = { gold: 0, owned: [], equipped: {}, knifeSkins: {}, freeCases: {}, missions: null, daily: null, locked: {}, resetIn: 0 };
+try { Object.assign(wallet, JSON.parse(localStorage.getItem('sa_wallet') || '{}')); } catch {}
+wallet.owned = wallet.owned.filter(id => SKIN_BY_ID[id]);
+let walletAt = performance.now();   // когда пришёл кошелёк (от него отсчитываем таймеры наград)
+// показать золото и запомнить копию (чтобы при следующем запуске сразу видеть свои скины)
+function saveProfile() {
+  try { localStorage.setItem('sa_wallet', JSON.stringify(wallet)); } catch {}
   const el = document.getElementById('goldBalance');
   if (el) el.textContent = `🪙 ${wallet.gold}`;
-}
-// копия кошелька — в профиле на сервере (не чаще раза в пару секунд)
-let walletUploadTimer = null;
-function scheduleWalletUpload() {
-  clearTimeout(walletUploadTimer);
-  walletUploadTimer = setTimeout(() => socialSend({ type: 'wallet', wallet }), 1500);
 }
 // Какие скины надеты у меня — те же объекты, что в профиле
 let mySkins = wallet.equipped;
@@ -1711,9 +1649,7 @@ function handle(m) {
         const why = { defuse: 'разминировал бомбу', bomb: 'заложил бомбу' }[m.mvp.why] || `больше всех убийств (${kills})`;
         sub = `★ MVP раунда: ${m.mvp.name} — ${why}`;
       }
-      const mineMvp = m.mvp?.id === me.id;
-      if (m.winner && m.winner === me.team) { addGold(5, 'победа в раунде'); missionEvent('round'); }
-      if (mineMvp) { addGold(10, 'MVP'); missionEvent('mvp'); }
+      const mineMvp = m.mvp?.id === me.id;   // золото и задания за раунд и MVP начисляет сервер
       showBanner(text, m.winner ? TEAM_COLOR[m.winner] : 0xffffff, 3500, sub, mineMvp);
       playTone(m.winner === me.team ? 880 : 220, 0.4, 0.12, 'sine');
       if (mineMvp) setTimeout(() => { playTone(1046, 0.15, 0.1, 'sine'); setTimeout(() => playTone(1568, 0.3, 0.1, 'sine'), 150); }, 400);
@@ -1768,7 +1704,6 @@ function handle(m) {
     case 'leave': removeRemote(m.id); break;
     case 'chat': addChat(m.text); break;
     case 'matchEnd':
-      if (m.winner === me.team) addGold(25, 'победа в матче');
       if (m.summary) showMatchSummary(m);
       else showBanner(m.winner === me.team ? 'ПОБЕДА В МАТЧЕ!' : 'ПОРАЖЕНИЕ В МАТЧЕ', TEAM_COLOR[m.winner], 6000);
       break;
@@ -1904,13 +1839,7 @@ function onKill(m) {
 
   if (m.killerId === me.id) showKillNotice(m, flags);
   else if (a?.id === me.id) showAssistNotice(m, a.flash);
-  if (m.killerTeam !== m.victimTeam) {  // за своих золото не даём
-    if (m.killerId === me.id) {
-      addGold(2, 'убийство');
-      missionEvent('kill', `kill:${m.weapon}`, m.head && 'head', m.jump && 'jump', m.wallbang && 'wallbang');
-    }
-    else if (a?.id === me.id) addGold(1, 'помощь');
-  }
+  // золото и задания за убийство и помощь начисляет сервер (приходят сообщениями 'gold' и 'missionDone')
   if (m.victimId === me.id) {
     const how = flags.map(f => ICON_TITLE[f]).join(', ');
     const title = `Тебя убил ${m.killer}${a ? ` с помощью ${a.name}` : ''}${how ? ` (${how})` : ''}`;
@@ -1921,13 +1850,11 @@ function onKill(m) {
   if (r) r.deathTime = performance.now();
 }
 
-// Золото за игру: копится в профиле, в игре — короткая надпись у денег
+// Золото за игру начисляет сервер; здесь — короткая надпись у денег и счёт для итогов матча
 let goldToast = 0, goldTimer = 0;
 let matchGold = 0;   // сколько золота набрано за текущий матч (для итогов)
-function addGold(n, why) {
-  wallet.gold += n;
+function showGoldGain(n, why) {
   matchGold += n;
-  saveProfile();
   goldToast += n;
   const el = $('goldDelta');
   el.textContent = `🪙 +${goldToast} ${why}`;
@@ -4166,6 +4093,7 @@ for (const b of document.querySelectorAll('.tabs button[data-tab]')) {
     showMenuAgent(settings.agent, menuTab === 'inventory' ? settings.knife : 'rifle');  // и снять примерку агента
     if (menuTab === 'shop') renderShop();
     if (menuTab === 'inventory') renderInventory();
+    if (menuTab === 'market') { socialSend({ type: 'market' }); renderMarket(); }   // свежие лоты
     if (menuTab === 'profile') { socialSend({ type: 'leaders' }); renderRankAndAch(); }  // свежая таблица лидеров
   });
 }
@@ -4215,8 +4143,9 @@ function equipSkin(weapon, id) {
     // скин ножа запоминается за своим типом ножа; надеваешь — берёшь этот нож в руки
     const type = SKIN_BY_ID[id]?.knife || settings.knife;
     if (!knifeOpen(type)) { toast(`Сначала открой нож «${KNIVES[type]}» — ${KNIFE_UNLOCK[type]} убийств`, null, 3500); return; }
-    if (id) wallet.knifeSkins[type] = id;
+    if (id) wallet.knifeSkins[type] = id;   // сразу у себя (чтобы не ждать ответа), и просим сервер запомнить
     else delete wallet.knifeSkins[type];
+    socialSend(id ? { type: 'equip', slot: 'knife', id } : { type: 'equip', slot: `knife:${type}` });
     settings.knife = type;
     syncKnifeSkin();
     saveProfile();
@@ -4227,6 +4156,7 @@ function equipSkin(weapon, id) {
   }
   if (id) wallet.equipped[weapon] = id;
   else delete wallet.equipped[weapon];
+  socialSend({ type: 'equip', slot: weapon, id: id || null });
   saveProfile();
   if (weapon.startsWith('agent')) {
     settings.agent = weapon.slice(6);  // надел агента — в меню стоит он
@@ -4236,11 +4166,37 @@ function equipSkin(weapon, id) {
 function buySkin(s) {
   const price = RARITY[s.rarity].price;
   if (wallet.gold < price || wallet.owned.includes(s.id)) return;
-  wallet.gold -= price;
-  wallet.owned.push(s.id);
+  askServer({ type: 'buySkin', id: s.id });   // ответ — 'bought' и новый кошелёк
+}
+function onSkinBought(s) {
+  if (!s) return;
+  if (!wallet.owned.includes(s.id)) wallet.owned.push(s.id);
   if (!s.knife || knifeOpen(s.knife)) equipSkin(s.weapon, s.id);  // купил — сразу надел (если нож уже открыт)
   playTone(1046, 0.12, 0.1, 'sine');
   renderShop();
+}
+// Просьба серверу из меню (покупка, кейс, награда). Нет связи — честно говорим об этом
+function askServer(msg) {
+  if (socialWs && socialWs.readyState === 1) { socialWs.send(JSON.stringify(msg)); return true; }
+  toast('Нет связи с сервером — попробуй через пару секунд', null, 3000);
+  return false;
+}
+// Новый кошелёк с сервера: показываем его и перерисовываем то, что от него зависит
+function onServerWallet(w) {
+  if (!w) return;
+  const before = JSON.stringify([wallet.equipped, wallet.knifeSkins]);
+  Object.assign(wallet, w);
+  walletAt = performance.now();
+  mySkins = wallet.equipped;
+  syncKnifeSkin();
+  saveProfile();
+  if (inGame) return;   // в матче — только золото (надпись), остальное перерисуем в меню
+  if (JSON.stringify([wallet.equipped, wallet.knifeSkins]) !== before) refreshMyWeapons();
+  renderShop();
+  renderDaily();
+  renderMissions();
+  if (menuTab === 'inventory') renderInventory();
+  if (menuTab === 'market') renderMarket();
 }
 
 let shopFilter = 'all', shopPreview = null;
@@ -4276,6 +4232,16 @@ function renderShop() {
       btn.textContent = on ? '✓ Надет' : 'Есть · надеть';
       btn.disabled = on;
       btn.addEventListener('click', e => { e.stopPropagation(); equipSkin(s.weapon, s.id); previewSkin(s); renderShop(); });
+    } else if (!SHOP_RARITIES.has(s.rarity)) {
+      // эпики, легендарки и ножи за золото не продаются — только из кейсов и у других игроков на рынке
+      btn.textContent = 'Кейсы и рынок →';
+      btn.classList.add('toMarket');
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        marketMode = 'buy';
+        marketFilter = isAgent(s) ? 'agent' : s.weapon;
+        document.querySelector('.tabs button[data-tab=market]').click();
+      });
     } else {
       const price = RARITY[s.rarity].price;
       btn.textContent = `Купить · 🪙 ${price}`;
@@ -4286,6 +4252,141 @@ function renderShop() {
     grid.append(card);
   }
 }
+
+// ================== РЫНОК ==================
+// Лоты, покупку и продажу проверяет сервер (economy.Market). Здесь — витрина: по каждому скину самый дешёвый лот,
+// своя продажа с ценой «сколько получишь после комиссии» и список своих лотов
+const MK = CATALOG.market;
+let marketData = null, marketMode = 'buy', marketFilter = 'all', sellSkin = null;
+for (const b of $('marketMode').children) b.addEventListener('click', () => { marketMode = b.dataset.m; sellSkin = null; renderMarket(); });
+for (const b of $('marketFilter').children) b.addEventListener('click', () => { marketFilter = b.dataset.w; renderMarket(); });
+const marketShows = s => marketFilter === 'all' || s.weapon === marketFilter || (marketFilter === 'agent' && isAgent(s));
+const lotsOf = id => (marketData?.lots || []).filter(l => l.skin === id);
+const fmtHours = sec => (sec >= 3600 ? `${Math.ceil(sec / 3600)} ч` : `${Math.max(1, Math.ceil(sec / 60))} мин`);
+function onMarket(m) { marketData = m; if (menuTab === 'market') renderMarket(); }
+function onMarketResult(m) {
+  if (m.ok) {
+    if (m.action === 'buy') {
+      const s = SKIN_BY_ID[m.skin];
+      toast(`🛒 Куплено: ${s ? `${skinOwner(s)} | ${s.name}` : ''} — уже в инвентаре`, null, 4000);
+      playTone(1046, 0.12, 0.1, 'sine');
+    } else if (m.action === 'sell') {
+      toast('📦 Скин выставлен на рынок', null, 3000);
+      sellSkin = null;
+    }
+  } else if (m.error) toast(`⚠ ${m.error}`, null, 4000);
+}
+function marketCard(s, label, action, opts = {}) {
+  const card = skinCard(s);
+  card.addEventListener('click', () => previewSkin(s));
+  if (opts.info) {
+    const info = document.createElement('span');
+    info.className = 'lotInfo';
+    info.innerHTML = opts.info;   // только числа и наш текст — без имён игроков
+    card.querySelector('b').after(info);
+  }
+  if (opts.lock) {
+    const tag = document.createElement('span');
+    tag.className = 'lockTag';
+    tag.textContent = `🔒 ${opts.lock}`;
+    card.append(tag);
+  }
+  if (opts.mine) card.classList.add('mineLot');
+  const btn = document.createElement('button');
+  btn.className = 'buy';
+  btn.textContent = label;
+  btn.disabled = !action;
+  if (action) btn.addEventListener('click', e => { e.stopPropagation(); action(); });
+  card.append(btn);
+  return card;
+}
+function renderMarket() {
+  for (const b of $('marketMode').children) b.classList.toggle('active', b.dataset.m === marketMode);
+  for (const b of $('marketFilter').children) b.classList.toggle('active', b.dataset.w === marketFilter);
+  const fee = Math.round((marketData?.fee ?? MK.fee) * 100);
+  $('marketInfo').textContent = `Покупай и продавай скины другим игрокам за золото. Комиссия продавца ${fee}% — она сгорает. ` +
+    `Новый скин можно продать через ${MK.tradeLockHours} ч после получения.`;
+  const mine = (marketData?.lots || []).filter(l => l.mine);
+  $('myLotCount').textContent = mine.length ? `(${mine.length})` : '';
+  const grid = $('marketGrid');
+  grid.textContent = '';
+  let empty = '';
+  if (!marketData) empty = 'Загружаем рынок…';
+  else if (marketMode === 'buy') {
+    // по каждому скину — самый дешёвый чужой лот
+    const best = new Map();
+    for (const l of marketData.lots) {
+      if (l.mine) continue;
+      const b = best.get(l.skin);
+      if (!b) best.set(l.skin, { lot: l, n: 1 });
+      else { b.n++; if (l.price < b.lot.price) b.lot = l; }
+    }
+    const rows = [...best.values()].filter(r => SKIN_BY_ID[r.lot.skin] && marketShows(SKIN_BY_ID[r.lot.skin]));
+    rows.sort((a, b) => a.lot.price - b.lot.price);
+    for (const { lot, n } of rows) {
+      const s = SKIN_BY_ID[lot.skin], have = wallet.owned.includes(s.id);
+      const last = marketData.history[s.id]?.slice(-1)[0];
+      const info = `${n > 1 ? `${n} шт. · ` : ''}в магазине 🪙 ${RARITY[s.rarity].price}${last ? ` · последняя продажа 🪙 ${last}` : ''}`;
+      const label = have ? 'Уже есть' : wallet.gold < lot.price ? `Не хватает 🪙 ${lot.price - wallet.gold}` : `Купить · 🪙 ${lot.price}`;
+      grid.append(marketCard(s, label, !have && wallet.gold >= lot.price ? () => {
+        if (confirm(`Купить «${skinOwner(s)} | ${s.name}» за ${lot.price} золота?`)) askServer({ type: 'marketBuy', lot: lot.id });
+      } : null, { info }));
+    }
+    if (!rows.length) empty = marketData.lots.length ? 'По этому фильтру сейчас никто ничего не продаёт' : 'На рынке пока пусто — выстави свой скин первым!';
+  } else if (marketMode === 'sell') {
+    const list = wallet.owned.map(id => SKIN_BY_ID[id]).filter(s => s && marketShows(s));
+    for (const s of list) {
+      const lockSec = wallet.locked?.[s.id];
+      const left = lockSec ? lockSec - (performance.now() - walletAt) / 1000 : 0;
+      grid.append(marketCard(s, left > 0 ? 'Пока нельзя' : 'Продать', left > 0 ? null : () => openSell(s),
+        { lock: left > 0 ? fmtHours(left) : null }));
+    }
+    if (!list.length) empty = 'Здесь появятся твои скины — их можно выставить на продажу';
+  } else {
+    for (const l of mine) {
+      const s = SKIN_BY_ID[l.skin];
+      if (!s || !marketShows(s)) continue;
+      grid.append(marketCard(s, 'Снять с продажи', () => askServer({ type: 'marketCancel', lot: l.id }),
+        { info: `Твоя цена: <b>🪙 ${l.price}</b> · получишь 🪙 ${l.price - Math.floor(l.price * MK.fee)}`, mine: true }));
+    }
+    if (!mine.length) empty = 'У тебя нет лотов на рынке';
+  }
+  $('marketEmpty').textContent = empty;
+  renderSellBox();
+}
+function openSell(s) {
+  sellSkin = s.id;
+  // подсказка цены: чуть дешевле самого дешёвого лота, иначе — около цены в магазине
+  const cheapest = Math.min(...lotsOf(s.id).filter(l => !l.mine).map(l => l.price));
+  $('sellPrice').value = Number.isFinite(cheapest) ? Math.max(MK.minPrice, cheapest - 1) : Math.round(RARITY[s.rarity].price * 0.8);
+  renderSellBox();
+  $('sellPrice').focus();
+}
+function renderSellBox() {
+  const s = sellSkin && SKIN_BY_ID[sellSkin];
+  $('sellBox').classList.toggle('hidden', !s || marketMode !== 'sell');
+  if (!s) return;
+  $('sellName').textContent = `${skinOwner(s)} | ${s.name}`;
+  const others = lotsOf(s.id).filter(l => !l.mine).map(l => l.price);
+  const hist = marketData?.history[s.id] || [];
+  $('sellHint').textContent = [
+    others.length ? `Дешевле всех сейчас: 🪙 ${Math.min(...others)}` : 'Других лотов с этим скином нет',
+    hist.length ? `последние продажи: ${hist.slice(-3).join(', ')}` : '',
+    `в магазине 🪙 ${RARITY[s.rarity].price}`,
+  ].filter(Boolean).join(' · ');
+  const price = Math.floor(+$('sellPrice').value || 0);
+  const ok = price >= MK.minPrice && price <= MK.maxPrice;
+  $('sellGet').textContent = ok ? `Получишь 🪙 ${price - Math.floor(price * MK.fee)} (комиссия ${Math.round(MK.fee * 100)}%)`
+    : `Цена — от ${MK.minPrice} до ${MK.maxPrice}`;
+  $('sellBtn').disabled = !ok;
+}
+$('sellPrice').addEventListener('input', renderSellBox);
+$('sellCancel').addEventListener('click', () => { sellSkin = null; renderSellBox(); });
+$('sellBtn').addEventListener('click', () => {
+  const s = SKIN_BY_ID[sellSkin], price = Math.floor(+$('sellPrice').value || 0);
+  if (!s || !confirm(`Выставить «${skinOwner(s)} | ${s.name}» за ${price} золота? Пока лот висит, скина не будет в инвентаре.`)) return;
+  askServer({ type: 'marketSell', id: s.id, price });
+});
 
 // Инвентарь: «Стандарт» или один из своих скинов на выбранное оружие и на нож
 function renderInventory() {
@@ -4325,15 +4426,14 @@ function renderInventory() {
   }
 }
 
-// Кейсы: сначала выпадает редкость (по весам), потом случайный скин этой редкости
-const CASES = [
-  { id: 'weapon', name: 'Оружейный кейс', icon: '📦', price: 300, note: 'Скины на всё огнестрельное оружие',
-    pool: SKINS.filter(s => s.weapon !== 'knife' && !isAgent(s)), weights: { common: 60, rare: 25, epic: 11, legendary: 4 } },
-  { id: 'knife', name: 'Ножевой кейс', icon: '🔪', price: 900, note: 'Всё подряд и шанс 15% на редкий нож',
-    pool: SKINS.filter(s => !isAgent(s)), weights: { common: 35, rare: 30, epic: 15, legendary: 5, knife: 15 } },
-  { id: 'agent', name: 'Кейс агентов', icon: '🕵️', price: 500, note: 'Персонажи за спецназ и террористов',
-    pool: SKINS.filter(isAgent), weights: { common: 45, rare: 28, epic: 16, legendary: 8, knife: 3 } },
-];
+// Кейсы (из catalog.json): сначала выпадает редкость (по весам), потом случайный скин этой редкости.
+// Настоящий выигрыш выбирает сервер; rollCase здесь — только для картинок на ленте рулетки
+const CASE_POOL = {
+  guns: s => s.weapon !== 'knife' && !isAgent(s),
+  noagents: s => !isAgent(s),
+  agents: isAgent,
+};
+const CASES = CATALOG.cases.map(c => ({ ...c, pool: SKINS.filter(CASE_POOL[c.pool]) }));
 function rollCase(c) {
   const rars = Object.keys(c.weights).filter(r => c.pool.some(s => s.rarity === r));
   let x = Math.random() * rars.reduce((sum, r) => sum + c.weights[r], 0);
@@ -4411,18 +4511,23 @@ $('caseOpen').addEventListener('mousedown', e => { if (e.target.id === 'caseOpen
 
 // Лента-рулетка: 45 карточек едут влево и останавливаются выигрышной под жёлтой чертой
 const REEL_STEP = 116, REEL_WIN = 38;
-let caseWon = null;
+let caseWon = null, caseAsked = false;
 function openCase(c) {
   const free = (wallet.freeCases[c.id] || 0) > 0;
-  if ((!free && wallet.gold < c.price) || caseWon) return;
-  const won = rollCase(c);
-  if (free) wallet.freeCases[c.id]--;   // кейс за уровень — без золота
-  else wallet.gold -= c.price;
-  const dupe = wallet.owned.includes(won.id);
-  const refund = dupe ? Math.round(RARITY[won.rarity].price * 0.3) : 0;
-  if (dupe) wallet.gold += refund;   // повтор — часть цены возвращается золотом
-  else wallet.owned.push(won.id);
-  saveProfile();   // сохраняем сразу, чтобы закрытие вкладки во время рулетки ничего не меняло
+  if ((!free && wallet.gold < c.price) || caseWon || caseAsked) return;
+  // что выпало — решает сервер (бесплатный кейс за уровень или золото спишет он же)
+  if (!askServer({ type: 'openCase', id: c.id })) return;
+  caseAsked = true;
+  $('caseSpin').disabled = true;
+}
+function onCaseResult(m) {
+  caseAsked = false;
+  const c = CASES.find(x => x.id === m.case), won = SKIN_BY_ID[m.won];
+  if (!c || !won) { toast('Не получилось открыть кейс — не хватает золота?', null, 3500); showCaseInfo(infoCase); return; }
+  startReel(c, won, m.dupe, m.refund);
+}
+// Лента рулетки останавливается на том, что выпало на сервере; повтор — часть цены вернули золотом
+function startReel(c, won, dupe, refund) {
   caseWon = won;
 
   $('caseTitle').textContent = c.name;
@@ -4473,67 +4578,43 @@ $('caseClose').addEventListener('click', () => {
   renderShop();
 });
 
-// Ежедневная награда: раз в календарный день. Заходишь подряд — серия растёт:
-// 1-й день 100, дальше +50 за каждый день подряд, максимум 400 (с 7-го дня)
-const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-const dailyAmount = streak => Math.min(400, 100 + 50 * (streak - 1));
-function dailyStreak() {  // какой по счёту день серии будет при получении сегодня
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return wallet.dailyDay === dayKey(yesterday) ? (wallet.streak || 0) + 1 : 1;
-}
+// Ежедневная награда: раз в сутки (новые сутки — в полночь по Гринвичу, одни на всех). Заходишь подряд —
+// серия растёт: 1-й день 100, дальше +50 за каждый день подряд, максимум 400. Считает сервер
+const resetLeft = () => Math.max(0, wallet.resetIn - (performance.now() - walletAt) / 1000);   // секунд до новых суток
 function renderDaily() {
-  const ready = wallet.dailyDay !== dayKey();
+  const d = wallet.daily;
+  const ready = !!d?.ready;
   const btn = $('dailyBtn');
   btn.disabled = !ready;
   $('dailyCard').classList.toggle('ready', ready);
   document.querySelector('.tabs button[data-tab=shop]').classList.toggle('gift', ready);
+  if (!d) { btn.textContent = '…'; $('dailyInfo').textContent = ''; return; }
   if (ready) {
-    const s = dailyStreak();
-    btn.textContent = `Забрать 🪙 ${dailyAmount(s)}`;
-    $('dailyInfo').textContent = s > 1 ? `Серия: ${s}-й день подряд 🔥` : 'Заходи каждый день — награда растёт';
+    btn.textContent = `Забрать 🪙 ${d.amount}`;
+    $('dailyInfo').textContent = d.streak > 1 ? `Серия: ${d.streak}-й день подряд 🔥` : 'Заходи каждый день — награда растёт';
   } else {
-    const midnight = new Date();
-    midnight.setHours(24, 0, 0, 0);
-    const min = Math.ceil((midnight - new Date()) / 60000);
+    const min = Math.ceil(resetLeft() / 60);
     btn.textContent = `Через ${Math.floor(min / 60)} ч ${min % 60} мин`;
-    const next = dailyAmount((wallet.streak || 0) + 1);
-    $('dailyInfo').textContent = `Серия: ${wallet.streak} д. · завтра будет 🪙 ${next}`;
+    $('dailyInfo').textContent = `Серия: ${wallet.streak} д. · завтра будет 🪙 ${d.tomorrow}`;
   }
 }
 $('dailyBtn').addEventListener('click', () => {
-  if (wallet.dailyDay === dayKey()) return;
-  wallet.streak = dailyStreak();
-  wallet.dailyDay = dayKey();
-  wallet.gold += dailyAmount(wallet.streak);
-  playTone(1046, 0.12, 0.1, 'sine');
-  setTimeout(() => playTone(1568, 0.25, 0.1, 'sine'), 120);
-  renderShop();
-  renderDaily();
+  if (wallet.daily?.ready) askServer({ type: 'claimDaily' });
 });
-setInterval(renderDaily, 30000);  // таймер и появление награды после полуночи
+setInterval(() => {   // таймер; когда начались новые сутки — свежий кошелёк (награда и задания) с сервера
+  if (wallet.daily && !wallet.daily.ready && resetLeft() <= 0 && !inGame) socialSend({ type: 'walletGet' });
+  renderDaily();
+}, 30000);
 
 // ================== УРОВНИ И ЗАДАНИЯ ==================
-// Опыт считает сервер (в профиле); награды за уровни — золото, а каждый 5-й уровень ещё и бесплатный кейс
-const levelReward = L => ({ gold: 100 + 25 * L, case: L % 10 === 0 ? 'knife' : L % 5 === 0 ? 'weapon' : null });
+// Опыт и награды за уровни считает сервер: золото, а каждый 5-й уровень ещё и бесплатный кейс (сообщение 'levelReward')
+const LR = CATALOG.rewards.level;
+const levelReward = L => ({ gold: LR.goldBase + LR.goldPerLevel * L,
+  case: L % LR.knifeCaseEvery === 0 ? 'knife' : L % LR.weaponCaseEvery === 0 ? 'weapon' : null });
 let levelData = null;
 function onLevel(m) {
   levelData = m;
-  // впервые видим уровень (или профиль новый) — выдаём награды за все уровни, набранные раньше
-  if (wallet.rewardLevel == null) wallet.rewardLevel = 1;
-  while (wallet.rewardLevel < m.level) {
-    const L = ++wallet.rewardLevel, r = levelReward(L);
-    wallet.gold += r.gold;
-    if (r.case) wallet.freeCases[r.case] = (wallet.freeCases[r.case] || 0) + 1;
-    const caseName = r.case && CASES.find(c => c.id === r.case).name;
-    toast(`⭐ Уровень ${L}! Награда: 🪙 ${r.gold}${caseName ? ` + ${caseName}` : ''}`, null, 7000);
-    if (inGame) addChat(`⭐ Новый уровень ${L}! 🪙 +${r.gold}${caseName ? ` и бесплатный кейс` : ''}`);
-    playTone(1318, 0.25, 0.12, 'sine');
-    setTimeout(() => playTone(1760, 0.3, 0.1, 'sine'), 180);
-  }
-  saveProfile();
   renderLevel();
-  renderShop();
 }
 function renderLevel() {
   if (!levelData) return;
@@ -4556,56 +4637,17 @@ function showXp(amount, reason) {
   xpTimer = setTimeout(() => { xpToast = 0; el.classList.remove('show'); }, 2200);
 }
 
-// Задания дня: каждый день — 3 случайных из списка; прогресс копится в игре, награду забираешь в профиле
-const MISSIONS = [
-  { id: 'kills',    icon: '🎯', text: 'Убей {n} врагов',            n: 12, gold: 150, ev: 'kill' },
-  { id: 'head',     icon: '💀', text: '{n} убийств в голову',        n: 5,  gold: 200, ev: 'head' },
-  { id: 'rounds',   icon: '🏆', text: 'Выиграй {n} раундов',         n: 5,  gold: 150, ev: 'round' },
-  { id: 'mvp',      icon: '⭐', text: 'Стань MVP {n} раза',          n: 2,  gold: 200, ev: 'mvp' },
-  { id: 'awp',      icon: '🔭', text: '{n} убийства с AWP',          n: 3,  gold: 250, ev: 'kill:awp' },
-  { id: 'knife',    icon: '🔪', text: 'Убей врага ножом',            n: 1,  gold: 300, ev: 'kill:knife' },
-  { id: 'smg',      icon: '💨', text: '{n} убийств из MP5',          n: 5,  gold: 200, ev: 'kill:smg' },
-  { id: 'shotgun',  icon: '💥', text: '{n} убийства из дробовика',   n: 4,  gold: 200, ev: 'kill:shotgun' },
-  { id: 'm4',       icon: '🔫', text: '{n} убийств из M4',           n: 6,  gold: 200, ev: 'kill:m4' },
-  { id: 'jump',     icon: '🦘', text: 'Убийство в прыжке',           n: 1,  gold: 250, ev: 'jump' },
-  { id: 'wallbang', icon: '🧱', text: '{n} убийства сквозь стену',   n: 2,  gold: 250, ev: 'wallbang' },
-];
+// Задания дня (из catalog.json): каждый день — 3 одинаковых у всех; прогресс считает сервер по событиям матча,
+// награду забираешь в профиле
+const MISSIONS = CATALOG.missions;
 const MISSION_BY_ID = Object.fromEntries(MISSIONS.map(m => [m.id, m]));
 const missionText = d => d.text.replace('{n}', d.n);
-function ensureMissions() {
-  const day = dayKey();
-  if (wallet.missions?.day === day) return;
-  // выбор зависит только от даты — у всех в один день одни и те же задания
-  let seed = [...day].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
-  const pool = MISSIONS.map(m => m.id);
-  const list = [];
-  while (list.length < 3) list.push({ id: pool.splice(Math.floor(rnd() * pool.length), 1)[0], p: 0, claimed: false });
-  wallet.missions = { day, list };
-  saveProfile();
-}
-// событие из игры: 'kill', 'kill:awp', 'head', 'round', 'mvp', 'jump', 'wallbang'
-function missionEvent(...events) {
-  ensureMissions();
-  for (const m of wallet.missions.list) {
-    const d = MISSION_BY_ID[m.id];
-    if (!events.includes(d.ev) || m.p >= d.n) continue;
-    m.p++;
-    if (m.p === d.n) {
-      toast(`✅ Задание выполнено: ${missionText(d)} — забери 🪙 ${d.gold} в профиле`, null, 6000);
-      if (inGame) addChat(`✅ Задание выполнено: ${missionText(d)}`);
-      playTone(1046, 0.15, 0.1, 'sine');
-    }
-  }
-  saveProfile();
-  renderMissions();
-}
 function renderMissions() {
-  ensureMissions();
   const box = $('missionList');
   box.textContent = '';
-  for (const m of wallet.missions.list) {
+  for (const [i, m] of (wallet.missions?.list || []).entries()) {
     const d = MISSION_BY_ID[m.id];
+    if (!d) continue;
     const row = document.createElement('div');
     row.className = 'mission' + (m.p >= d.n ? ' done' : '');
     row.innerHTML = '<span class="mi"></span><div class="mt"><b></b><small></small><div class="bar"><div></div></div></div><button></button>';
@@ -4618,19 +4660,11 @@ function renderMissions() {
     btn.disabled = m.claimed || m.p < d.n;
     btn.addEventListener('click', () => {
       if (m.claimed || m.p < d.n) return;
-      m.claimed = true;
-      wallet.gold += d.gold;
-      saveProfile();
-      playTone(1046, 0.12, 0.1, 'sine');
-      renderMissions();
-      renderShop();
+      if (askServer({ type: 'claimMission', i })) { btn.disabled = true; playTone(1046, 0.12, 0.1, 'sine'); }
     });
     box.append(row);
   }
-  const midnight = new Date();
-  midnight.setHours(24, 0, 0, 0);
-  const h = Math.ceil((midnight - new Date()) / 3600000);
-  $('missionsReset').textContent = `· новые через ${h} ч`;
+  $('missionsReset').textContent = wallet.missions ? `· новые через ${Math.ceil(resetLeft() / 3600)} ч` : '';
 }
 renderMissions();
 setInterval(renderMissions, 60000);
@@ -4790,7 +4824,7 @@ function renderGoogle() {
 }
 $('googleLogout').addEventListener('click', () => {
   if (!confirm('Выйти из профиля на этом устройстве? Прогресс останется в Google-аккаунте — войдёшь снова, и он вернётся.')) return;
-  try { for (const k of ['sa_token', 'sa_profile', 'sa_kills']) localStorage.removeItem(k); } catch {}
+  try { for (const k of ['sa_token', 'sa_wallet', 'sa_kills']) localStorage.removeItem(k); } catch {}
   location.reload();
 });
 
@@ -4818,29 +4852,55 @@ function handleSocial(m) {
       socialToken = m.token;
       try { localStorage.setItem('sa_token', m.token); } catch {}
       break;
-    case 'wallet': {
-      // кошелёк из профиля на сервере. После входа через Google (force) берём серверный целиком —
-      // это прогресс аккаунта; иначе — тот, что новее. Если новее наш — отправляем его на сервер
-      let force = false;
-      try { force = localStorage.getItem('sa_wallet_force') === '1'; localStorage.removeItem('sa_wallet_force'); } catch {}
-      const w = m.wallet;
-      if (force || (w && (w.rev || 0) > (wallet.rev || 0))) {
-        try {
-          if (w) localStorage.setItem('sa_profile', JSON.stringify(w));
-          else localStorage.removeItem('sa_profile');   // у аккаунта ещё нет кошелька — начинаем с нуля
-        } catch {}
-        if (!inGame) location.reload();   // проще всего перерисовать всё заново
-        break;
-      }
-      if (!w || (wallet.rev || 0) > (w.rev || 0)) socialSend({ type: 'wallet', wallet });
+    case 'wallet':      // кошелёк с сервера — единственный настоящий
+      onServerWallet(m.wallet);
+      break;
+    case 'gold':        // золото за игру: надпись у денег и счёт для итогов матча
+      showGoldGain(m.amount, m.reason);
+      break;
+    case 'levelReward': {
+      const caseName = m.case && CASES.find(c => c.id === m.case).name;
+      toast(`⭐ Уровень ${m.level}! Награда: 🪙 ${m.gold}${caseName ? ` + ${caseName}` : ''}`, null, 7000);
+      if (inGame) addChat(`⭐ Новый уровень ${m.level}! 🪙 +${m.gold}${caseName ? ` и бесплатный кейс` : ''}`);
+      playTone(1318, 0.25, 0.12, 'sine');
+      setTimeout(() => playTone(1760, 0.3, 0.1, 'sine'), 180);
+      break;
+    }
+    case 'missionDone': {
+      const d = MISSION_BY_ID[m.id];
+      if (!d) break;
+      toast(`✅ Задание выполнено: ${missionText(d)} — забери 🪙 ${d.gold} в профиле`, null, 6000);
+      if (inGame) addChat(`✅ Задание выполнено: ${missionText(d)}`);
+      playTone(1046, 0.15, 0.1, 'sine');
+      break;
+    }
+    case 'bought':
+      if (m.ok) onSkinBought(SKIN_BY_ID[m.id]);
+      break;
+    case 'caseResult':
+      onCaseResult(m);
+      break;
+    case 'dailyClaimed':
+      if (m.amount > 0) { playTone(1046, 0.12, 0.1, 'sine'); setTimeout(() => playTone(1568, 0.25, 0.1, 'sine'), 120); }
+      break;
+    case 'market':
+      onMarket(m);
+      break;
+    case 'marketResult':
+      onMarketResult(m);
+      break;
+    case 'marketSold': {
+      const s = SKIN_BY_ID[m.skin];
+      toast(`💰 Продан на рынке: ${s ? `${skinOwner(s)} | ${s.name}` : m.skin} за 🪙 ${m.price} — тебе 🪙 ${m.earned}`, null, 7000);
+      playTone(1318, 0.2, 0.1, 'sine');
       break;
     }
     case 'google':
       if (m.switch) {
-        // этот Google-аккаунт уже привязан к другому профилю — переходим на него (вместе с его кошельком)
+        // этот Google-аккаунт уже привязан к другому профилю — переходим на него (кошелёк пришлёт сервер)
         try {
           localStorage.setItem('sa_token', m.switch);
-          localStorage.setItem('sa_wallet_force', '1');
+          localStorage.removeItem('sa_wallet');
           localStorage.removeItem('sa_kills');
         } catch {}
         location.reload();
@@ -5009,10 +5069,7 @@ function renderRankAndAch() {
 }
 // новое достижение — уведомление и награда золотом
 let matchAch = [];
-function onAchievement(m) {
-  wallet.gold += m.gold;
-  saveProfile();
-  renderShop();
+function onAchievement(m) {   // золото за достижение уже начислил сервер (новый кошелёк придёт следом)
   matchAch.push(m);
   toast(`🏆 Достижение «${m.name}»: ${m.desc} · 🪙 +${m.gold}`, null, 7000);
   if (inGame) addChat(`🏆 Достижение: ${m.name} (🪙 +${m.gold})`);

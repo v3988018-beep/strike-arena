@@ -11,6 +11,7 @@
 import asyncio
 import json
 import os
+import time
 import random
 import secrets
 import string
@@ -19,6 +20,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiohttp import web, WSMsgType
 
+import economy
+
 DATA_FILE = Path(__file__).parent / "data" / "profiles.json"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DB_SAVE_DELAY = 3.0    # изменения копятся и пишутся в базу одной записью раз в несколько секунд
@@ -26,7 +29,6 @@ DB_SAVE_DELAY = 3.0    # изменения копятся и пишутся в 
 GOOGLE_CLIENT_ID = os.environ.get(
     "GOOGLE_CLIENT_ID", "510296852748-vv4kuqedvrc491738nmpg0qgofdodkkc.apps.googleusercontent.com").strip()
 GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
-WALLET_MAX = 64_000    # кошелёк (золото, скины, кейсы) — не больше стольких символов JSON
 
 
 async def verify_google(credential):
@@ -139,6 +141,7 @@ class Social:
         self.in_game = set()              # кто сейчас в игре
         self.lobbies = {}                 # код → лобби
         self.lobby_of = {}                # id игрока → код лобби
+        self.market = economy.Market()    # рынок скинов между игроками
         # база данных (на хостинге): пул соединений, прочитана ли она, есть ли несохранённое
         self.db = None
         self.db_ok = False
@@ -161,10 +164,16 @@ class Social:
             p["stats"].setdefault("xp", p["stats"].get("kills", 0) * 20 + p["stats"].get("wins", 0) * 100)
             p["stats"].setdefault("elo", START_ELO)
             p.setdefault("ach", [])
+            p["wallet"] = economy.migrate(p.get("wallet"))   # кошелёк считает сервер (старые — переносим)
             self.profiles[p["id"]] = p
             self.by_token[p["token"]] = p["id"]
             if p.get("google"):
                 self.by_google[p["google"]] = p["id"]
+        self.market = economy.Market(data.get("market"))
+
+    def dump(self):
+        """Всё, что хранится: профили и рынок."""
+        return json.dumps({"profiles": list(self.profiles.values()), "market": self.market.dump()}, ensure_ascii=False)
 
     def save(self):
         if DATABASE_URL:
@@ -175,8 +184,7 @@ class Social:
             return
         DATA_FILE.parent.mkdir(exist_ok=True)
         tmp = DATA_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"profiles": list(self.profiles.values())}, ensure_ascii=False),
-                       encoding="utf-8")
+        tmp.write_text(self.dump(), encoding="utf-8")
         tmp.replace(DATA_FILE)  # сначала во временный файл — чтобы не испортить при сбое
 
     # ---------- база данных (сервер в интернете) ----------
@@ -217,7 +225,7 @@ class Social:
         if not (self.db_ok and self.dirty):
             return
         self.dirty = False
-        data = json.dumps({"profiles": list(self.profiles.values())}, ensure_ascii=False)
+        data = self.dump()
         try:
             await self.db.execute(
                 "INSERT INTO store (key, data, updated) VALUES ('profiles', $1, now()) "
@@ -279,6 +287,8 @@ class Social:
                     len(p["friends"]) if key == "friends" else s.get(key, 0 if key != "elo" else START_ELO))
             if have >= need:
                 p["ach"].append(aid)
+                economy.add_gold(self.wallet(pid), gold)   # награда за достижение — золотом в кошелёк
+                self.push_wallet(pid)
                 if pid in self.sessions:
                     asyncio.get_event_loop().create_task(self.send(pid, {
                         "type": "achievement", "id": aid, "name": name, "desc": desc, "gold": gold}))
@@ -306,12 +316,121 @@ class Social:
         return {"type": "leaders", "duel": [row(p) for p in duel], "level": [row(p) for p in lvl]}
 
     def give_xp(self, pid, amount, reason):
-        """Опыт за игру: в профиль и сразу игроку — «+20 XP за убийство»."""
+        """Опыт за игру: в профиль и сразу игроку — «+20 XP за убийство». Новый уровень — награда."""
         if pid not in self.profiles or amount <= 0:
             return
         self.record(pid, xp=amount)
         if pid in self.sessions:
             asyncio.get_event_loop().create_task(self.send(pid, {"type": "xp", "amount": amount, "reason": reason}))
+        self.check_levels(pid)
+
+    # ---------- кошелёк (золото, скины, кейсы) — считает только сервер ----------
+    def wallet(self, pid):
+        p = self.profiles[pid]
+        if not p.get("wallet"):
+            p["wallet"] = economy.new_wallet()
+        return p["wallet"]
+
+    def push_wallet(self, pid):
+        if pid in self.sessions:
+            w = economy.public(self.wallet(pid))
+            asyncio.get_event_loop().create_task(self.send(pid, {"type": "wallet", "wallet": w}))
+
+    def notify(self, pid, msg):
+        if pid in self.sessions:
+            asyncio.get_event_loop().create_task(self.send(pid, msg))
+
+    def check_levels(self, pid):
+        """Набран новый уровень — золото и кейсы за него (за каждый 5-й/10-й уровень)."""
+        w = self.wallet(pid)
+        level = level_info(self.profiles[pid]["stats"].get("xp", 0))[0]
+        got = economy.level_up(w, level)
+        if got:
+            self.save()
+            for r in got:
+                self.notify(pid, {"type": "levelReward", **r})
+            self.push_wallet(pid)
+
+    def game_gold(self, pid, amount, reason):
+        """Золото за игру (убийство, победа, MVP) — вызывает server.py."""
+        if pid not in self.profiles or amount <= 0:
+            return
+        economy.add_gold(self.wallet(pid), amount)
+        self.save()
+        self.notify(pid, {"type": "gold", "amount": amount, "reason": reason})
+        self.push_wallet(pid)
+
+    def game_mission(self, pid, *events):
+        """Событие для заданий дня ('kill', 'kill:awp', 'head', 'round', ...) — вызывает server.py."""
+        if pid not in self.profiles:
+            return
+        done = economy.mission_event(self.wallet(pid), {e for e in events if e})
+        self.save()
+        for d in done:
+            self.notify(pid, {"type": "missionDone", "id": d["id"], "gold": d["gold"]})
+        self.push_wallet(pid)
+
+    async def wallet_action(self, pid, ws, data):
+        """Просьбы из меню: купить скин, открыть кейс, надеть, забрать награду, рынок."""
+        kind, w = data.get("type"), self.wallet(pid)
+        reply = lambda msg: ws.send_str(json.dumps(msg, ensure_ascii=False))
+        changed = False
+        if kind == "buySkin":
+            sid = data.get("id")
+            changed = economy.buy_skin(w, sid)
+            await reply({"type": "bought", "id": sid, "ok": changed})
+        elif kind == "openCase":
+            res = economy.open_case(w, data.get("id"))
+            changed = res is not None
+            await reply({"type": "caseResult", "case": data.get("id"), **(res or {"won": None})})
+        elif kind == "equip":
+            sid = data.get("id") if isinstance(data.get("id"), str) else None
+            changed = economy.equip(w, str(data.get("slot", "")), sid)
+        elif kind == "claimDaily":
+            amount = economy.claim_daily(w)
+            changed = amount > 0
+            await reply({"type": "dailyClaimed", "amount": amount})
+        elif kind == "claimMission":
+            amount = economy.claim_mission(w, data.get("i"))
+            changed = amount > 0
+        elif kind == "market":
+            await reply(self.market_view(pid))
+        elif kind == "marketSell":
+            price = data.get("price")
+            price = int(price) if isinstance(price, (int, float)) and not isinstance(price, bool) and abs(price) < 1e12 else None
+            lot, err = self.market.sell(pid, w, data.get("id"), price)
+            changed = lot is not None
+            await reply({"type": "marketResult", "action": "sell", "ok": changed, "error": err})
+            if changed:
+                await reply(self.market_view(pid))
+        elif kind == "marketCancel":
+            changed = self.market.cancel(pid, w, data.get("lot"))
+            await reply({"type": "marketResult", "action": "cancel", "ok": changed})
+            await reply(self.market_view(pid))
+        elif kind == "marketBuy":
+            lot = self.market.listings.get(data.get("lot"))
+            seller = lot and self.profiles.get(lot["seller"])
+            lot, earned, err = self.market.buy(pid, w, data.get("lot"), seller and self.wallet(seller["id"]))
+            changed = lot is not None
+            await reply({"type": "marketResult", "action": "buy", "ok": changed, "error": err,
+                         "skin": lot and lot["skin"]})
+            await reply(self.market_view(pid))
+            if changed and seller:
+                self.notify(seller["id"], {"type": "marketSold", "skin": lot["skin"], "price": lot["price"],
+                                           "earned": earned})
+                self.push_wallet(seller["id"])
+        if changed:
+            self.save()
+        self.push_wallet(pid)
+
+    def market_view(self, pid):
+        """Все лоты (сначала дешёвые) и последние цены продаж по каждому скину."""
+        lots = sorted(self.market.listings.values(), key=lambda lot: (lot["skin"], lot["price"], lot["at"]))
+        name = lambda i: self.profiles[i]["name"] if i in self.profiles else "?"
+        return {"type": "market", "fee": economy.MARKET["fee"],
+                "lots": [{"id": lot["id"], "skin": lot["skin"], "price": lot["price"], "seller": name(lot["seller"]),
+                          "mine": lot["seller"] == pid} for lot in lots[:1000]],
+                "history": {k: [h[0] for h in v[-10:]] for k, v in self.market.history.items()}}
 
     async def set_in_game(self, pid, playing):
         if not pid:
@@ -605,8 +724,9 @@ class Social:
                     self.check_achievements(pid)   # достижения за то, что уже сделано раньше
                     self.save()
                     await self.push_me(pid)
-                    # кошелёк из профиля: браузер возьмёт его, если он новее своего (или после входа через Google)
-                    await ws.send_str(json.dumps({"type": "wallet", "wallet": self.profiles[pid].get("wallet")},
+                    # кошелёк считает сервер: браузер просто показывает то, что пришло
+                    self.check_levels(pid)
+                    await ws.send_str(json.dumps({"type": "wallet", "wallet": economy.public(self.wallet(pid))},
                                                  ensure_ascii=False))
                     await self.push_friends(pid)
                     lobby = self.lobbies.get(self.lobby_of.get(pid))
@@ -622,12 +742,9 @@ class Social:
                     self.save()
                     await self.push_me(pid)
                     await self.push_friends_of(pid)
-                elif kind == "wallet":
-                    # золото, скины, кейсы — копия в профиле, чтобы не пропали с очисткой браузера
-                    w = data.get("wallet")
-                    if isinstance(w, dict) and len(json.dumps(w, ensure_ascii=False)) <= WALLET_MAX:
-                        self.profiles[pid]["wallet"] = w
-                        self.save()
+                elif kind in ("walletGet", "buySkin", "openCase", "equip", "claimDaily", "claimMission",
+                              "market", "marketSell", "marketCancel", "marketBuy"):
+                    await self.wallet_action(pid, ws, data)
                 elif kind == "google":
                     await self.google_login(pid, ws, data.get("credential"))
                 elif kind == "friendAdd":

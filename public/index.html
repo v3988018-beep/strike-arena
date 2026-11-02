@@ -63,6 +63,7 @@
       <button data-tab="play" class="active">Играть</button>
       <button data-tab="inventory">Инвентарь</button>
       <button data-tab="shop">Магазин</button>
+      <button data-tab="market">Рынок</button>
       <button data-tab="profile">Профиль</button>
       <button id="menuOptionsBtn">Настройки</button>
     </nav>
@@ -172,7 +173,7 @@
   <section class="sidePanel hidden" id="tab-shop">
     <h2>Магазин</h2>
     <p class="sub">🪙 Золото даётся за игру: убийства, помощь, победы в раундах, MVP и победу в матче.
-      Нажми на скин, чтобы примерить его на персонаже.</p>
+      Нажми на скин, чтобы примерить его на персонаже. Эпические, легендарные скины и ★ ножи — только из кейсов и на рынке.</p>
     <div class="dailyCard" id="dailyCard">
       <div class="dailyIcon">🎁</div>
       <div class="dailyText"><b>Ежедневная награда</b><small id="dailyInfo"></small></div>
@@ -187,6 +188,29 @@
       <button data-w="pistol">USP</button><button data-w="deagle">Deagle</button><button data-w="knife">Ножи</button><button data-w="agent">Агенты</button>
     </div>
     <div class="skinGrid" id="skinGrid"></div>
+  </section>
+
+  <!-- РЫНОК: игроки продают друг другу скины за золото (всё проверяет сервер) -->
+  <section class="sidePanel hidden" id="tab-market">
+    <h2>Рынок</h2>
+    <p class="sub" id="marketInfo">Покупай и продавай скины другим игрокам за золото.</p>
+    <div class="seg" id="marketMode">
+      <button data-m="buy">Купить</button><button data-m="sell">Продать</button><button data-m="mine">Мои лоты <span id="myLotCount"></span></button>
+    </div>
+    <div class="seg mini" id="marketFilter">
+      <button data-w="all">Все</button><button data-w="rifle">AKR</button><button data-w="awp">AWP</button>
+      <button data-w="m4">M4</button><button data-w="smg">MP5</button><button data-w="shotgun">Nova</button>
+      <button data-w="pistol">USP</button><button data-w="deagle">Deagle</button><button data-w="knife">Ножи</button><button data-w="agent">Агенты</button>
+    </div>
+    <!-- продажа выбранного скина: цена, сколько получишь после комиссии -->
+    <div class="sellBox hidden" id="sellBox">
+      <div class="sellHead"><b id="sellName"></b><button id="sellCancel" class="ghostBtn small">✕</button></div>
+      <small id="sellHint"></small>
+      <div class="inlineForm"><input id="sellPrice" type="number" min="10" step="1" inputmode="numeric"><button id="sellBtn">Выставить</button></div>
+      <small id="sellGet"></small>
+    </div>
+    <div class="skinGrid" id="marketGrid"></div>
+    <p class="sub" id="marketEmpty"></p>
   </section>
 
   <!-- ПРОФИЛЬ И ДРУЗЬЯ -->

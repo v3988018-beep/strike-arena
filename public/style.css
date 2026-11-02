@@ -256,6 +256,21 @@ body.touch .buyHead #buyClose { margin-left: auto; }
 .buyCat button:disabled { opacity: .45; cursor: default; }
 .buyCat button.owned { opacity: .7; border-color: #3f7a3f; }
 .buyCat button.sell { border-color: #3f7a3f; background: rgba(63,122,63,.25); }
+/* ===== Рынок ===== */
+.skinCard .buy.toMarket { background: rgba(255,255,255,.06); color: #ffcf6b; border: 1px solid rgba(245,166,35,.45); }
+#marketMode { margin: 4px 0 8px; }
+#marketFilter { margin-bottom: 10px; flex-wrap: wrap; }
+.skinCard .lotInfo { display: block; font-size: 11px; color: #9aa7bd; margin: 2px 0 4px; }
+.skinCard .lotInfo b { color: #7ee07e; }
+.skinCard.mineLot { outline: 1px dashed rgba(245,166,35,.6); }
+.skinCard .lockTag { position: absolute; top: 6px; left: 6px; font-size: 11px; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,.6); color: #ffcf6b; }
+.sellBox { padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: rgba(245,166,35,.08); border: 1px solid rgba(245,166,35,.35); }
+.sellBox.hidden { display: none; }
+.sellHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sellBox small { display: block; color: #9aa7bd; margin: 4px 0; line-height: 1.35; }
+.sellBox #sellGet { color: #7ee07e; }
+.sellBox input { width: 120px; }
+
 /* ===== Редактор расположения кнопок (телефон) ===== */
 .touchOnly { display: none !important; }
 body.touch .touchOnly { display: flex !important; }
