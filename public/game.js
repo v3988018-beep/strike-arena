@@ -3800,6 +3800,7 @@ function closeBuy() {
   lockMouse();
   updatePauseHint();
 }
+$('buyClose').addEventListener('click', closeBuy);   // на телефоне нет клавиш B и Esc — закрываем крестиком
 // цена с учётом разминки (бесплатно) и шлема, если жилет уже есть
 function priceOf(item, base) {
   if (phase === 'warmup') return 0;
