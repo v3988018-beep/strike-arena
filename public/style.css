@@ -250,6 +250,33 @@ svg.ic.jump { fill: #ffd84d; }
 .buyCat button:disabled { opacity: .45; cursor: default; }
 .buyCat button.owned { opacity: .7; border-color: #3f7a3f; }
 .buyCat button.sell { border-color: #3f7a3f; background: rgba(63,122,63,.25); }
+/* ===== Редактор расположения кнопок (телефон) ===== */
+.touchOnly { display: none !important; }
+body.touch .touchOnly { display: flex !important; }
+#layoutEditor { position: fixed; inset: 0; z-index: 300; background-color: rgba(8,12,20,.9);
+  background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 40px 40px; touch-action: none; }
+#layoutEditor.hidden { display: none; }
+#layoutStage { position: absolute; inset: 0; }
+#layoutStage #touchUI { display: block; }
+#touchUI.editing #joyZone, #touchUI.editing #lookPad { pointer-events: none !important; background: rgba(255,255,255,.03); }
+#touchUI.editing #joyZone { outline: 1px dashed rgba(255,255,255,.15); }
+#touchUI.editing #joyBase { pointer-events: auto !important; }
+#touchUI.editing .tb.c4.hidden { display: block !important; }
+#touchUI.editing [data-li] { outline: 2px dashed rgba(255,255,255,.35); outline-offset: 3px; cursor: grab; }
+#touchUI.editing [data-li].leSel { outline: 3px solid #f5a623; }
+.lePanel { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); width: min(360px, 60vw); z-index: 2;
+  background: rgba(14,18,26,.92); border: 1px solid rgba(255,255,255,.15); border-radius: 12px; padding: 8px 12px; color: #fff; }
+.lePanel.low { top: auto; bottom: 8px; }   /* выбранная кнопка вверху — панель уезжает вниз, чтобы не закрывать её */
+.leTitle { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.leTitle small { opacity: .6; font-size: 11px; }
+.leRow { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 8px; font-size: 13px; margin: 2px 0; }
+.leRow input { accent-color: #f5a623; }
+.leRow input:disabled { opacity: .35; }
+.leRow output { text-align: right; font-variant-numeric: tabular-nums; opacity: .8; }
+.leBtns { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.leBtns #leSave { background: #f5a623; color: #111; border: 0; border-radius: 8px; padding: 6px 14px; font-weight: 800; }
+
 /* вход через Google в профиле */
 .googleBox { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
 .googleBox small { display: block; opacity: .75; margin-bottom: 8px; line-height: 1.35; }
@@ -565,7 +592,7 @@ body.touch .sidePanel, body.touch .caseItems, body.touch .caseBox, body.touch .o
 .tb.switch { right: 120px; bottom: 240px; width: 48px; height: 48px; font-size: 19px; }
 .tb.use { right: 196px; bottom: 200px; width: 48px; height: 48px; font-size: 17px; }
 .tb.nade { right: 186px; bottom: 260px; width: 44px; height: 44px; font-size: 17px; }
-.tb.c4 { left: 24px; bottom: 270px; width: 50px; height: 50px; font-size: 15px; background: rgba(75,90,50,.6); }
+.tb.c4 { right: 246px; bottom: 250px; width: 50px; height: 50px; font-size: 15px; background: rgba(75,90,50,.6); }
 .tb.c4.hidden { display: none; }
 .ttop { position: absolute; top: 8px; right: 230px; display: flex; gap: 6px; }
 .ttop button { width: 40px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,22,.55); color: #fff; font-size: 16px; font-weight: 800; }

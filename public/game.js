@@ -5666,7 +5666,7 @@ if (touchMode) {
     if (e.pointerId !== joyId) return;
     joyId = null; touchMove = null;
     knob.style.transform = '';
-    base.style.left = ''; base.style.top = ''; base.style.bottom = '';
+    applyTouchLayout();   // джойстик возвращается на своё место (своё — если игрок его передвинул)
   };
   zone.addEventListener('pointerup', joyEnd);
   zone.addEventListener('pointercancel', joyEnd);
@@ -5700,9 +5700,137 @@ if (touchMode) {
   }
   addEventListener('contextmenu', e => e.preventDefault());
 }
+
+// ================== РАСПОЛОЖЕНИЕ КНОПОК (как в Standoff 2) ==================
+// Для каждой кнопки игрок может задать место (x, y — центр в долях экрана), размер s и прозрачность o.
+// Хранится в этом браузере: { fire: { x, y, s, o }, ... }. Нет записи — кнопка стоит как в style.css
+const LAYOUT_KEY = 'sa_touch_layout';
+const LAYOUT_NAMES = {
+  fire: 'Огонь (справа)', fire2: 'Огонь (слева)', aim: 'Прицел', jump: 'Прыжок', crouch: 'Присед',
+  reload: 'Перезарядка', switch: 'Смена оружия', use: 'Действие (E)', nade: 'Гранаты', c4: 'Бомба (C4)',
+  ttop: 'Верхний ряд', joy: 'Джойстик',
+};
+let touchLayout = {};
+try { touchLayout = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') || {}; } catch {}
+let layoutEditing = false;
+
+const layoutItems = () => [...document.querySelectorAll('#touchUI [data-li]')];
+function applyTouchLayout(layout = touchLayout) {
+  for (const el of layoutItems()) {
+    const L = layout[el.dataset.li];
+    const isJoy = el.dataset.li === 'joy';   // у джойстика центр задаёт отступ margin в CSS, а не translate
+    Object.assign(el.style, { left: '', top: '', right: '', bottom: '', transform: '', opacity: '' });
+    if (!L) continue;
+    Object.assign(el.style, {
+      left: `${L.x * 100}%`, top: `${L.y * 100}%`, right: 'auto', bottom: 'auto',
+      transform: `${isJoy ? '' : 'translate(-50%, -50%) '}scale(${L.s ?? 1})`, opacity: String(L.o ?? 1),
+    });
+  }
+}
+
+function initLayoutEditor() {
+  const ui = $('touchUI'), editor = $('layoutEditor'), stage = $('layoutStage'), panel = editor.querySelector('.lePanel');
+  for (const b of ui.querySelectorAll('.tb')) b.dataset.li = b.classList[1];
+  ui.querySelector('.ttop').dataset.li = 'ttop';
+  $('joyBase').dataset.li = 'joy';
+
+  let draft = {}, sel = null, drag = null;
+  const center = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  // запись для кнопки: если её ещё не двигали — берём текущее место на экране
+  const entry = el => {
+    const k = el.dataset.li;
+    if (!draft[k]) {
+      const r = stage.getBoundingClientRect(), c = center(el);
+      draft[k] = { x: (c.x - r.left) / r.width, y: (c.y - r.top) / r.height, s: 1, o: 1 };
+    }
+    return draft[k];
+  };
+  function renderPanel() {
+    for (const el of layoutItems()) el.classList.toggle('leSel', el === sel);
+    const L = sel && entry(sel);
+    $('leName').textContent = sel ? LAYOUT_NAMES[sel.dataset.li] || sel.dataset.li : 'Выбери кнопку';
+    for (const [id, v] of [['leSize', L ? Math.round(L.s * 100) : 100], ['leAlpha', L ? Math.round(L.o * 100) : 100]]) {
+      $(id).value = v;
+      $(id).disabled = !sel;
+      $(`${id}Out`).textContent = `${v}%`;
+    }
+    // выбранная кнопка в верхней части экрана — панель уходит вниз, чтобы её не закрывать
+    panel.classList.toggle('low', !!L && L.y < 0.35);
+  }
+
+  function open() {
+    layoutEditing = true;
+    draft = JSON.parse(JSON.stringify(touchLayout));
+    sel = null;
+    stage.append(ui);              // те же кнопки, что в игре — переносим их в редактор
+    ui.classList.remove('hidden');
+    ui.classList.add('editing');
+    editor.classList.remove('hidden');
+    applyTouchLayout(draft);
+    renderPanel();
+  }
+  function close(save) {
+    if (save) {
+      touchLayout = draft;
+      try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(touchLayout)); } catch {}
+    }
+    layoutEditing = false;
+    for (const el of layoutItems()) el.classList.remove('leSel');
+    ui.classList.remove('editing');
+    $('hud').insertBefore(ui, $('rotateHint'));   // кнопки — обратно в интерфейс игры
+    editor.classList.add('hidden');
+    applyTouchLayout();
+    updateTouchUI();
+  }
+
+  // Перетаскивание. Ловим касание раньше самих кнопок (capture) — в редакторе они не должны стрелять и прыгать
+  stage.addEventListener('pointerdown', e => {
+    const el = e.target.closest('[data-li]');
+    e.stopPropagation();
+    e.preventDefault();
+    if (!el) { sel = null; renderPanel(); return; }
+    sel = el;
+    const L = entry(el), r = stage.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - (r.left + L.x * r.width), dy: e.clientY - (r.top + L.y * r.height) };
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+    renderPanel();
+  }, true);
+  stage.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const r = stage.getBoundingClientRect(), L = entry(sel);
+    L.x = Math.min(0.98, Math.max(0.02, (e.clientX - drag.dx - r.left) / r.width));
+    L.y = Math.min(0.98, Math.max(0.02, (e.clientY - drag.dy - r.top) / r.height));
+    applyTouchLayout(draft);
+    panel.classList.toggle('low', L.y < 0.35);
+  }, true);
+  const dragEnd = e => { if (drag && e.pointerId === drag.id) drag = null; };
+  stage.addEventListener('pointerup', dragEnd, true);
+  stage.addEventListener('pointercancel', dragEnd, true);
+
+  $('leSize').addEventListener('input', e => {
+    if (!sel) return;
+    entry(sel).s = +e.target.value / 100;
+    $('leSizeOut').textContent = `${e.target.value}%`;
+    applyTouchLayout(draft);
+  });
+  $('leAlpha').addEventListener('input', e => {
+    if (!sel) return;
+    entry(sel).o = +e.target.value / 100;
+    $('leAlphaOut').textContent = `${e.target.value}%`;
+    applyTouchLayout(draft);
+  });
+  $('leReset').addEventListener('click', () => { draft = {}; sel = null; applyTouchLayout(draft); renderPanel(); });
+  $('leCancel').addEventListener('click', () => close(false));
+  $('leSave').addEventListener('click', () => close(true));
+  $('o_layoutBtn').addEventListener('click', open);
+}
+if (touchMode) {
+  initLayoutEditor();
+  applyTouchLayout();
+}
 // экранные кнопки видны только в матче и когда не открыт магазин/меню
 function updateTouchUI() {
-  if (!touchMode) return;
+  if (!touchMode || layoutEditing) return;   // в редакторе кнопки видны всегда
   $('touchUI').classList.toggle('hidden', !inGame || buyOpen || teamMenuOpen || optionsOpen || cheatPanelOpen);
 }
 

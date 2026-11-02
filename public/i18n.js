@@ -207,6 +207,13 @@
       'Sign in with Google so your progress, gold and skins are never lost and work on any device',
     '✓ Профиль привязан к Google': '✓ Profile linked to Google', 'Выйти': 'Sign out',
     'Политика конфиденциальности': 'Privacy policy',
+    // редактор расположения кнопок
+    'Кнопки на экране': 'On-screen buttons', '✥ Настроить расположение': '✥ Customize layout',
+    'Выбери кнопку': 'Pick a button', 'Перетаскивай кнопки пальцем': 'Drag buttons with your finger',
+    'Прозрачность': 'Opacity', 'Отмена': 'Cancel', 'Сохранить': 'Save',
+    'Огонь (справа)': 'Fire (right)', 'Огонь (слева)': 'Fire (left)', 'Прыжок': 'Jump', 'Присед': 'Crouch',
+    'Перезарядка': 'Reload', 'Смена оружия': 'Switch weapon', 'Действие (E)': 'Use (E)', 'Бомба (C4)': 'Bomb (C4)',
+    'Верхний ряд': 'Top row', 'Джойстик': 'Joystick',
     '✓ Профиль привязан к Google — прогресс сохранится': '✓ Profile linked to Google — your progress is saved',
     'Не получилось войти через Google — попробуй ещё раз': "Couldn't sign in with Google — try again",
     '↩ продать': '↩ sell', '↩ продать +${0}': '↩ sell +${0}',
