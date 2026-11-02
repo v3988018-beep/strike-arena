@@ -252,6 +252,8 @@
     <div id="requestsBox"></div>
     <div class="optLabel">Друзья <small id="friendsCount"></small></div>
     <div class="friendList" id="friendList"></div>
+    <div class="optLabel">История обменов</div>
+    <div id="tradeHistory"></div>
     <p class="sub" id="socialOffline"></p>
   </section>
 
@@ -392,6 +394,25 @@
     <div class="buyHead"><b>Магазин</b><span id="buyMoney">$ 0</span><small>B или Esc — закрыть</small>
       <button id="buyClose" title="Закрыть">✕</button></div>
     <div id="buyGrid"></div>
+  </div>
+</div>
+
+<!-- Обмен скинами с другом: что отдаёшь ты, что отдаёт он, «Готов» и «Подтвердить» (через 5 секунд) -->
+<div id="tradeWin" class="hidden">
+  <div class="panel tradePanel">
+    <div class="tradeHead"><b id="tradeTitle">Обмен</b><button id="tradeClose" class="ghostBtn small">✕</button></div>
+    <div class="tradeCols">
+      <div class="tradeCol"><div class="optLabel">Ты отдаёшь <small id="tradeMyState"></small></div><div class="tradeItems" id="tradeMine"></div></div>
+      <div class="tradeArrow">⇄</div>
+      <div class="tradeCol"><div class="optLabel"><span id="tradeTheyGive">Друг отдаёт</span> <small id="tradeTheirState"></small></div><div class="tradeItems" id="tradeTheirs"></div></div>
+    </div>
+    <p class="tradeNote" id="tradeNote"></p>
+    <div class="tradeBtns">
+      <button id="tradeReady" class="ghostBtn">Готов</button>
+      <button id="tradeConfirm">Подтвердить обмен</button>
+    </div>
+    <div class="optLabel">Твои скины — нажми, чтобы добавить или убрать</div>
+    <div class="tradeItems pick" id="tradePick"></div>
   </div>
 </div>
 

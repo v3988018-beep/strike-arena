@@ -207,6 +207,18 @@
       'Sign in with Google so your progress, gold and skins are never lost and work on any device',
     '✓ Профиль привязан к Google': '✓ Profile linked to Google', 'Выйти': 'Sign out',
     'Политика конфиденциальности': 'Privacy policy',
+    // обмен
+    'История обменов': 'Trade history', 'Обмен': 'Trade', '🔄 Обмен': '🔄 Trade', 'Обмен с {0}': 'Trade with {0}',
+    'Ты отдаёшь': 'You give', 'Друг отдаёт': 'Friend gives', '{0} отдаёт': '{0} gives', 'Готов': 'Ready',
+    '✓ Готов (нажми, чтобы изменить)': '✓ Ready (click to change)', 'Подтвердить обмен': 'Confirm trade',
+    'Подтвердить ({0})': 'Confirm ({0})', 'Ждём друга…': 'Waiting for your friend…', 'Пока ничего': 'Nothing yet',
+    '· ✓ готов': '· ✓ ready', '· ✓ подтвердил': '· ✓ confirmed', 'У тебя пока нет скинов': "You don't have any skins yet",
+    'Твои скины — нажми, чтобы добавить или убрать': 'Your skins — click to add or remove',
+    'Выберите скины и нажмите «Готов». Любое изменение снимает «Готов» у обоих.': 'Pick skins and press “Ready”. Any change un-readies both of you.',
+    'Проверь ещё раз, что отдаёт друг — подтвердить можно через пару секунд': 'Double-check what your friend gives — you can confirm in a few seconds',
+    'Всё верно? Подтверди обмен. Полученные скины можно будет отдать или продать через 24 ч.': 'All good? Confirm the trade. Skins you receive can be traded or sold after 24 h.',
+    '🔄 {0} предлагает обмен скинами': '🔄 {0} offers a skin trade', 'Открыть': 'Open', 'Отменить обмен?': 'Cancel the trade?',
+    '✅ Обмен состоялся! Получено: {0}': '✅ Trade complete! You got: {0}',
     // рынок и экономика
     'Кейсы и рынок →': 'Cases & market →',
     '🪙 Золото даётся за игру: убийства, помощь, победы в раундах, MVP и победу в матче. Нажми на скин, чтобы примерить его на персонаже. Эпические, легендарные скины и ★ ножи — только из кейсов и на рынке.':

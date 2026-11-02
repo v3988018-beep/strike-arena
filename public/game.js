@@ -4197,6 +4197,7 @@ function onServerWallet(w) {
   renderMissions();
   if (menuTab === 'inventory') renderInventory();
   if (menuTab === 'market') renderMarket();
+  if (tradeState) renderTrade();
 }
 
 let shopFilter = 'all', shopPreview = null;
@@ -4387,6 +4388,128 @@ $('sellBtn').addEventListener('click', () => {
   if (!s || !confirm(`Выставить «${skinOwner(s)} | ${s.name}» за ${price} золота? Пока лот висит, скина не будет в инвентаре.`)) return;
   askServer({ type: 'marketSell', id: s.id, price });
 });
+
+// ================== ОБМЕН С ДРУГОМ ==================
+// Всё проверяет сервер (social.py): только друзья и только скины, новый скин — через 24 ч, «Подтвердить» —
+// через 5 с после «Готов» у обоих; любое изменение снимает «Готов». Здесь — окно обмена и подсказки
+let tradeState = null, tradeTimer = null;
+const tItem = (s, cls = '') => {
+  const el = document.createElement('div');
+  el.className = `tItem ${cls}`;
+  el.style.setProperty('--rar', RARITY[s.rarity].color);
+  const sw = document.createElement('i');
+  sw.style.backgroundImage = `url(${swatchUrl(s)})`;
+  const name = document.createElement('span');
+  name.textContent = `${skinOwner(s)} | ${s.name}`;
+  el.title = `${skinOwner(s)} | ${s.name} · ${RARITY[s.rarity].name}`;
+  el.append(sw, name);
+  return el;
+};
+function onTrade(m) {
+  tradeState = m;
+  $('tradeWin').classList.remove('hidden');
+  clearInterval(tradeTimer);
+  if (m.confirmIn != null) {   // обратный отсчёт до кнопки «Подтвердить»
+    const until = performance.now() + m.confirmIn * 1000;
+    tradeState.confirmUntil = until;
+    tradeTimer = setInterval(renderTrade, 250);
+  }
+  renderTrade();
+}
+function renderTrade() {
+  const t = tradeState;
+  if (!t) return;
+  $('tradeTitle').textContent = `Обмен с ${t.partner.name}#${t.partner.tag}`;
+  $('tradeTheyGive').textContent = `${t.partner.name} отдаёт`;
+  const fill = (box, ids, click) => {
+    box.textContent = '';
+    for (const id of ids) {
+      const s = SKIN_BY_ID[id];
+      if (!s) continue;
+      const el = tItem(s);
+      if (click) el.addEventListener('click', () => click(id));
+      box.append(el);
+    }
+    if (!ids.length) { const e = document.createElement('span'); e.className = 'empty'; e.textContent = 'Пока ничего'; box.append(e); }
+  };
+  const setMine = ids => socialSend({ type: 'tradeSet', items: ids });
+  fill($('tradeMine'), t.mine, id => setMine(t.mine.filter(x => x !== id)));
+  fill($('tradeTheirs'), t.theirs);
+  $('tradeMine').parentElement.classList.toggle('ready', t.myReady);
+  $('tradeTheirs').parentElement.classList.toggle('ready', t.theirReady);
+  $('tradeMyState').textContent = t.myConfirm ? '· ✓ подтвердил' : t.myReady ? '· ✓ готов' : '';
+  $('tradeTheirState').textContent = t.theirConfirm ? '· ✓ подтвердил' : t.theirReady ? '· ✓ готов' : '';
+  // свои скины: недавно полученные и те, что у друга уже есть, отдать нельзя
+  const pick = $('tradePick');
+  pick.textContent = '';
+  const locked = new Set(t.locked), theirs = new Set(t.partnerOwned);
+  for (const id of wallet.owned) {
+    const s = SKIN_BY_ID[id];
+    if (!s) continue;
+    const on = t.mine.includes(id), why = locked.has(id) ? 'получен меньше суток назад' : theirs.has(id) ? 'у друга уже есть' : '';
+    const el = tItem(s, on ? 'on' : why ? 'off' : '');
+    if (why) el.title += ` — нельзя: ${why}`;
+    else el.addEventListener('click', () => setMine(on ? t.mine.filter(x => x !== id) : [...t.mine, id]));
+    pick.append(el);
+  }
+  if (!wallet.owned.length) { const e = document.createElement('span'); e.className = 'empty'; e.textContent = 'У тебя пока нет скинов'; pick.append(e); }
+  // кнопки и подсказка
+  const both = t.myReady && t.theirReady;
+  const wait = both && t.confirmUntil ? Math.max(0, (t.confirmUntil - performance.now()) / 1000) : 0;
+  $('tradeReady').textContent = t.myReady ? '✓ Готов (нажми, чтобы изменить)' : 'Готов';
+  $('tradeReady').classList.toggle('on', t.myReady);
+  $('tradeConfirm').disabled = !both || wait > 0 || t.myConfirm || (!t.mine.length && !t.theirs.length);
+  $('tradeConfirm').textContent = t.myConfirm ? 'Ждём друга…' : wait > 0 ? `Подтвердить (${Math.ceil(wait)})` : 'Подтвердить обмен';
+  $('tradeNote').textContent = !both ? 'Выберите скины и нажмите «Готов». Любое изменение снимает «Готов» у обоих.'
+    : wait > 0 ? 'Проверь ещё раз, что отдаёт друг — подтвердить можно через пару секунд'
+    : 'Всё верно? Подтверди обмен. Полученные скины можно будет отдать или продать через 24 ч.';
+  if (!both || wait <= 0) { clearInterval(tradeTimer); tradeTimer = null; }
+}
+function closeTradeWin() {
+  tradeState = null;
+  clearInterval(tradeTimer);
+  $('tradeWin').classList.add('hidden');
+}
+$('tradeReady').addEventListener('click', () => tradeState && socialSend({ type: 'tradeReady', on: !tradeState.myReady }));
+$('tradeConfirm').addEventListener('click', () => socialSend({ type: 'tradeConfirm' }));
+$('tradeClose').addEventListener('click', () => { if (confirm('Отменить обмен?')) socialSend({ type: 'tradeCancel' }); });
+function onTradeInvite(m) {
+  const who = `${m.from.name}#${m.from.tag}`;
+  if (inGame) addChat(`🔄 ${who} предлагает обмен — выйди в меню, чтобы ответить`);
+  toast(`🔄 ${who} предлагает обмен скинами`, [
+    ['Открыть', 'yes', () => socialSend({ type: 'tradeAccept', id: m.from.id })],
+    ['Нет', 'no', () => socialSend({ type: 'tradeDecline', id: m.from.id })],
+  ], 30000, 'invite');
+  playTone(988, 0.12, 0.1, 'sine');
+}
+function onTradeDone(m) {
+  closeTradeWin();
+  const names = ids => ids.map(id => SKIN_BY_ID[id]?.name || id).join(', ') || 'ничего';
+  toast(`✅ Обмен состоялся! Получено: ${names(m.got)}`, null, 7000);
+  playTone(1046, 0.12, 0.1, 'sine');
+  setTimeout(() => playTone(1568, 0.25, 0.1, 'sine'), 120);
+}
+function renderTradeHistory() {
+  const box = $('tradeHistory');
+  box.textContent = '';
+  const list = [...(profileMe?.trades || [])].reverse();
+  const names = ids => ids.map(id => SKIN_BY_ID[id] ? `${skinOwner(SKIN_BY_ID[id])} | ${SKIN_BY_ID[id].name}` : id).join(', ') || '—';
+  for (const h of list) {
+    const row = document.createElement('div');
+    row.className = 'tRow';
+    const who = document.createElement('b');
+    who.textContent = `${h.with}#${h.withTag}`;
+    row.append(`${new Date(h.at * 1000).toLocaleDateString()} · обмен с `, who, ` · отдал: ${names(h.gave)} · получил: ${names(h.got)}`);
+    box.append(row);
+  }
+  if (!list.length) {
+    const e = document.createElement('div');
+    e.className = 'tRow';
+    e.textContent = profileMe?.tradeBlock ? `Пока обменов не было. ${profileMe.tradeBlock}.`
+      : 'Пока обменов не было. Нажми «🔄 Обмен» у друга в сети, чтобы предложить обмен.';
+    box.append(e);
+  }
+}
 
 // Инвентарь: «Стандарт» или один из своих скинов на выбранное оружие и на нож
 function renderInventory() {
@@ -4897,6 +5020,16 @@ function handleSocial(m) {
     case 'market':
       onMarket(m);
       break;
+    case 'trade': onTrade(m); break;
+    case 'tradeInvite': onTradeInvite(m); break;
+    case 'tradeDone': onTradeDone(m); break;
+    case 'tradeClosed':
+      closeTradeWin();
+      toast(`🔄 ${m.reason}`, null, 5000);
+      break;
+    case 'tradeResult':
+      if (m.text) toast(`${m.ok ? '🔄' : '⚠'} ${m.text}`, null, 4000);
+      break;
     case 'marketResult':
       onMarketResult(m);
       break;
@@ -4938,6 +5071,7 @@ function handleSocial(m) {
       onLevel(m);
       renderProfile();
       renderGoogle();
+      renderTradeHistory();
       renderRankAndAch();
       renderKnives();
       renderInventory();
@@ -5173,6 +5307,7 @@ function renderFriends() {
   for (const f of [...friends].sort((a, b) => order[a.status] - order[b.status])) {
     const btns = [];
     if (f.status === 'menu' || f.status === 'lobby') btns.push(['Позвать 1×1', 'ok', () => socialSend({ type: 'lobbyInvite', id: f.id })]);
+    if (f.status !== 'offline') btns.push(['🔄 Обмен', 'ok', () => socialSend({ type: 'tradeInvite', id: f.id })]);
     btns.push(['✕', '', () => { if (confirm(I18N.tr(`Удалить ${f.name} из друзей?`))) socialSend({ type: 'friendRemove', id: f.id }); }]);
     list.append(friendRow(f, btns));
   }
@@ -5391,6 +5526,7 @@ showMenuAgent(settings.agent, 'rifle');
 // Для отладки: http://localhost:8080/?debug — доступ к игроку и стрельбе из консоли
 if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startInspect, viewModels, knifeAttack, switchWeapon, setKnifeModel, playAnim, KNIFE_POSE, tick,
   setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
+  openInspect, closeInspect, renderInspect,
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t) {

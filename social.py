@@ -123,6 +123,15 @@ def rank_of(elo):
     return [name for need, name in RANKS if elo >= need][-1]
 
 
+# Обмен: с какого уровня (или сразу после входа через Google), сколько скинов за раз,
+# сколько секунд ждать после «Готов» у обоих до кнопки «Подтвердить», сколько живёт приглашение
+TRADE_MIN_LEVEL = 5
+TRADE_MAX_ITEMS = 10
+TRADE_CONFIRM_DELAY = 5.0
+TRADE_INVITE_TTL = 60
+TRADE_HISTORY = 20
+
+
 def default_settings(map_id):
     s = {k: v[0] for k, v in LOBBY_OPTIONS.items() if v}
     s["map"] = map_id
@@ -142,6 +151,11 @@ class Social:
         self.lobbies = {}                 # код → лобби
         self.lobby_of = {}                # id игрока → код лобби
         self.market = economy.Market()    # рынок скинов между игроками
+        # обмен скинами между друзьями: идущие обмены живут только в памяти (перезапуск сервера их отменяет)
+        self.trades = {}                  # id → обмен
+        self.trade_of = {}                # id игрока → id его обмена
+        self.trade_invites = {}           # (кто зовёт, кого) → когда
+        self.next_trade = 1
         # база данных (на хостинге): пул соединений, прочитана ли она, есть ли несохранённое
         self.db = None
         self.db_ok = False
@@ -479,6 +493,7 @@ class Social:
                               "level": level, "xpHave": have, "xpNeed": need,
                               "rank": rank_of(p["stats"].get("elo", START_ELO)), "ach": p.get("ach", []),
                               "google": bool(p.get("google")),
+                              "trades": p.get("trades", [])[-10:], "tradeBlock": self.trade_block(pid),
                               "achList": [{"id": a, "name": n, "desc": d, "gold": g, "key": k, "need": need_}
                                           for a, n, d, k, need_, g in ACHIEVEMENTS]})
 
@@ -663,6 +678,180 @@ class Social:
             await self.send(m, {"type": "lobbyStart", "room": lobby["room"]})
 
     # ---------- соединение ----------
+    # ---------- обмен скинами между друзьями ----------
+    # Защита: только друзья и только скины (без золота — иначе твинки сливали бы золото на главный профиль),
+    # с 5-го уровня или после входа через Google, новый (и полученный в обмене) скин — через 24 ч.
+    # В окне обмена любое изменение снимает «Готов» у обоих; «Подтвердить» — только через 5 с после «Готов»,
+    # чтобы в последний момент не подсунули другой скин
+    def trade_block(self, pid):
+        """Почему этому игроку пока нельзя меняться (или None)."""
+        p = self.profiles[pid]
+        if p.get("google") or level_info(p["stats"].get("xp", 0))[0] >= TRADE_MIN_LEVEL:
+            return None
+        return f"Обмен открывается с {TRADE_MIN_LEVEL} уровня или после входа через Google"
+
+    def tradable(self, pid, skin_id, now):
+        w = self.wallet(pid)
+        lock = economy.MARKET["tradeLockHours"] * 3600
+        return skin_id in w["owned"] and w["got"].get(skin_id, 0) + lock <= now
+
+    def trade_side(self, t, pid):
+        return "a" if t["a"] == pid else "b"
+
+    def trade_state(self, t, pid):
+        me, other = self.trade_side(t, pid), "b" if self.trade_side(t, pid) == "a" else "a"
+        oid, now = t[other], time.time()
+        both = t["ready"]["a"] and t["ready"]["b"]
+        lock = economy.MARKET["tradeLockHours"] * 3600
+        w = self.wallet(pid)
+        return {"type": "trade", "id": t["id"],
+                "partner": {"id": oid, "name": self.profiles[oid]["name"], "tag": self.profiles[oid]["tag"]},
+                "mine": t["items"][me], "theirs": t["items"][other],
+                "myReady": t["ready"][me], "theirReady": t["ready"][other],
+                "myConfirm": t["confirm"][me], "theirConfirm": t["confirm"][other],
+                "confirmIn": max(0.0, t["ready_at"] + TRADE_CONFIRM_DELAY - now) if both else None,
+                "partnerOwned": self.wallet(oid)["owned"],
+                "locked": [k for k, v in w["got"].items() if v + lock > now]}
+
+    async def trade_push(self, t):
+        for side in ("a", "b"):
+            await self.send(t[side], self.trade_state(t, t[side]))
+
+    async def trade_invite(self, pid, oid, reply):
+        me, now = self.profiles[pid], time.time()
+        if oid not in me["friends"] or oid not in self.profiles:
+            return await reply("Меняться можно только с друзьями")
+        if oid not in self.sessions:
+            return await reply("Друг сейчас не в сети")
+        err = self.trade_block(pid)
+        if err:
+            return await reply(err)
+        if self.trade_block(oid):
+            return await reply(f"У друга обмен ещё закрыт: нужен {TRADE_MIN_LEVEL} уровень или вход через Google")
+        if pid in self.trade_of or oid in self.trade_of:
+            return await reply("Кто-то из вас уже меняется")
+        self.trade_invites[(pid, oid)] = now
+        await self.send(oid, {"type": "tradeInvite", "from": {"id": pid, "name": me["name"], "tag": me["tag"]}})
+        await reply("Приглашение к обмену отправлено", ok=True)
+
+    async def trade_accept(self, pid, fid, reply):
+        at = self.trade_invites.pop((fid, pid), None)
+        if not at or time.time() - at > TRADE_INVITE_TTL or fid not in self.sessions:
+            return await reply("Приглашение устарело")
+        if pid in self.trade_of or fid in self.trade_of:
+            return await reply("Кто-то из вас уже меняется")
+        if self.trade_block(pid) or self.trade_block(fid):
+            return await reply(self.trade_block(pid) or "У друга обмен ещё закрыт")
+        t = {"id": self.next_trade, "a": fid, "b": pid, "items": {"a": [], "b": []},
+             "ready": {"a": False, "b": False}, "confirm": {"a": False, "b": False}, "ready_at": 0.0}
+        self.next_trade += 1
+        self.trades[t["id"]] = t
+        self.trade_of[fid] = self.trade_of[pid] = t["id"]
+        await self.trade_push(t)
+
+    async def trade_set(self, pid, items, reply):
+        """Что я отдаю. Любое изменение снимает «Готов» и подтверждение у обоих."""
+        t = self.trades.get(self.trade_of.get(pid))
+        if not t:
+            return
+        side = self.trade_side(t, pid)
+        other = t["b" if side == "a" else "a"]
+        if not isinstance(items, list) or len(items) > TRADE_MAX_ITEMS:
+            return await reply(f"Не больше {TRADE_MAX_ITEMS} скинов за один обмен")
+        items = list(dict.fromkeys(i for i in items if isinstance(i, str)))
+        now = time.time()
+        for i in items:
+            if not self.tradable(pid, i, now):
+                return await reply("Этот скин нельзя отдать: его нет или он получен меньше суток назад")
+            if i in self.wallet(other)["owned"]:
+                return await reply("Такой скин у друга уже есть")
+        t["items"][side] = items
+        t["ready"] = {"a": False, "b": False}
+        t["confirm"] = {"a": False, "b": False}
+        await self.trade_push(t)
+
+    async def trade_ready(self, pid, on):
+        t = self.trades.get(self.trade_of.get(pid))
+        if not t:
+            return
+        t["ready"][self.trade_side(t, pid)] = bool(on)
+        t["confirm"] = {"a": False, "b": False}
+        if t["ready"]["a"] and t["ready"]["b"]:
+            t["ready_at"] = time.time()
+        await self.trade_push(t)
+
+    async def trade_confirm(self, pid, reply):
+        t = self.trades.get(self.trade_of.get(pid))
+        if not t or not (t["ready"]["a"] and t["ready"]["b"]):
+            return
+        if time.time() < t["ready_at"] + TRADE_CONFIRM_DELAY:
+            return await reply("Подожди пару секунд и проверь, что отдаёт друг")
+        t["confirm"][self.trade_side(t, pid)] = True
+        if t["confirm"]["a"] and t["confirm"]["b"]:
+            await self.trade_finish(t)
+        else:
+            await self.trade_push(t)
+
+    async def trade_finish(self, t):
+        """Обе стороны подтвердили — ещё раз всё проверяем и меняем скины местами."""
+        now = time.time()
+        a, b = t["a"], t["b"]
+        give = {a: t["items"]["a"], b: t["items"]["b"]}
+        ok = bool(give[a] or give[b]) and all(
+            self.tradable(pid, i, now) and i not in self.wallet(b if pid == a else a)["owned"]
+            for pid in (a, b) for i in give[pid])
+        if not ok:
+            await self.trade_close(t, "Обмен не состоялся: скины изменились, начните заново")
+            return
+        for giver, taker in ((a, b), (b, a)):
+            for i in give[giver]:
+                economy.take_skin(self.wallet(giver), i)
+                economy.give_skin(self.wallet(taker), i, now)   # полученный скин — снова на 24 ч под замком
+        for me, other in ((a, b), (b, a)):
+            hist = self.profiles[me].setdefault("trades", [])
+            hist.append({"at": int(now), "with": self.profiles[other]["name"], "withTag": self.profiles[other]["tag"],
+                         "gave": give[me], "got": give[other]})
+            del hist[:-TRADE_HISTORY]
+        self.save()
+        self.trades.pop(t["id"], None)
+        for pid in (a, b):
+            self.trade_of.pop(pid, None)
+            other = b if pid == a else a
+            await self.send(pid, {"type": "tradeDone", "gave": give[pid], "got": give[other]})
+            self.push_wallet(pid)
+            await self.push_me(pid)
+
+    async def trade_close(self, t, reason):
+        self.trades.pop(t["id"], None)
+        for pid in (t["a"], t["b"]):
+            self.trade_of.pop(pid, None)
+            await self.send(pid, {"type": "tradeClosed", "reason": reason})
+
+    async def trade_action(self, pid, ws, data):
+        kind = data.get("type")
+
+        async def reply(text, ok=False):
+            await ws.send_str(json.dumps({"type": "tradeResult", "ok": ok, "text": text}, ensure_ascii=False))
+
+        if kind == "tradeInvite":
+            await self.trade_invite(pid, str(data.get("id")), reply)
+        elif kind == "tradeAccept":
+            await self.trade_accept(pid, str(data.get("id")), reply)
+        elif kind == "tradeDecline":
+            if self.trade_invites.pop((str(data.get("id")), pid), None):
+                await self.send(str(data.get("id")), {"type": "tradeClosed",
+                                                      "reason": f"{self.profiles[pid]['name']} отказался от обмена"})
+        elif kind == "tradeSet":
+            await self.trade_set(pid, data.get("items"), reply)
+        elif kind == "tradeReady":
+            await self.trade_ready(pid, data.get("on"))
+        elif kind == "tradeConfirm":
+            await self.trade_confirm(pid, reply)
+        elif kind == "tradeCancel":
+            t = self.trades.get(self.trade_of.get(pid))
+            if t:
+                await self.trade_close(t, f"{self.profiles[pid]['name']} отменил обмен")
+
     async def google_login(self, pid, ws, credential):
         """Вход через Google. Аккаунт уже привязан к профилю — переключаем браузер на тот профиль
         (так прогресс переезжает на новое устройство). Не привязан — привязываем к текущему."""
@@ -733,6 +922,9 @@ class Social:
                     await ws.send_str(json.dumps({"type": "lobby", "lobby": lobby and self.lobby_public(lobby)}))
                     if first:
                         await self.push_friends_of(pid)  # друзья видят, что он в сети
+                    t = self.trades.get(self.trade_of.get(pid))
+                    if t:   # обновил страницу посреди обмена — окно обмена возвращается
+                        await ws.send_str(json.dumps(self.trade_state(t, pid), ensure_ascii=False))
                     continue
                 if pid is None:
                     continue
@@ -745,6 +937,9 @@ class Social:
                 elif kind in ("walletGet", "buySkin", "openCase", "equip", "claimDaily", "claimMission",
                               "market", "marketSell", "marketCancel", "marketBuy"):
                     await self.wallet_action(pid, ws, data)
+                elif kind in ("tradeInvite", "tradeAccept", "tradeDecline", "tradeSet", "tradeReady",
+                              "tradeConfirm", "tradeCancel"):
+                    await self.trade_action(pid, ws, data)
                 elif kind == "google":
                     await self.google_login(pid, ws, data.get("credential"))
                 elif kind == "friendAdd":
@@ -774,8 +969,11 @@ class Social:
                 conns = self.sessions.get(pid, set())
                 conns.discard(ws)
                 if not conns:
-                    # закрыл игру совсем — выходит из лобби, друзья видят «не в сети»
+                    # закрыл игру совсем — выходит из лобби и обмена, друзья видят «не в сети»
                     self.sessions.pop(pid, None)
                     await self.lobby_leave(pid)
+                    t = self.trades.get(self.trade_of.get(pid))
+                    if t:
+                        await self.trade_close(t, f"{self.profiles[pid]['name']} вышел из игры — обмен отменён")
                     await self.push_friends_of(pid)
         return ws
