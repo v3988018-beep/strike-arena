@@ -253,6 +253,7 @@ svg.ic.jump { fill: #ffd84d; }
 /* вход через Google в профиле */
 .googleBox { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
 .googleBox small { display: block; opacity: .75; margin-bottom: 8px; line-height: 1.35; }
+.privacyLink { display: inline-block; margin-top: 8px; font-size: 12px; color: #9aa4b2; }
 #googleIn { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9be29b; font-weight: 700; }
 #googleIn.hidden, #googleOut.hidden, .googleBox.hidden { display: none; }
 .buyCat button.sell .price { color: #9be29b; }

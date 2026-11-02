@@ -206,6 +206,7 @@
     'Войди через Google, чтобы прогресс, золото и скины не пропали и открывались на любом устройстве':
       'Sign in with Google so your progress, gold and skins are never lost and work on any device',
     '✓ Профиль привязан к Google': '✓ Profile linked to Google', 'Выйти': 'Sign out',
+    'Политика конфиденциальности': 'Privacy policy',
     '✓ Профиль привязан к Google — прогресс сохранится': '✓ Profile linked to Google — your progress is saved',
     'Не получилось войти через Google — попробуй ещё раз': "Couldn't sign in with Google — try again",
     '↩ продать': '↩ sell', '↩ продать +${0}': '↩ sell +${0}',
