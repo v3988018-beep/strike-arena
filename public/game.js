@@ -46,7 +46,8 @@ let touchMove = null;   // джойстик: { x, y } от -1 до 1 (y < 0 — 
 // Сразу убираем ключ из адресной строки, чтобы он не попал в скриншот или в ссылку, которой делишься
 let ownerKey = '';
 try {
-  const k = new URLSearchParams(location.search).get('owner');
+  // в адресе «+» читается как пробел, а ключ от Render содержит «+» — возвращаем его на место
+  const k = (new URLSearchParams(location.search).get('owner') || '').trim().replace(/ /g, '+');
   if (k) {
     localStorage.setItem('sa_owner', k);
     const u = new URL(location.href); u.searchParams.delete('owner'); history.replaceState(null, '', u);

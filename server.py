@@ -101,7 +101,11 @@ CHEAT_PROFILES = {"6304"}   # только дома; в интернете — �
 
 def cheats_allowed(pid, key):
     if HOSTED:
-        return bool(OWNER_KEY) and isinstance(key, str) and hmac.compare_digest(key, OWNER_KEY)
+        if not (OWNER_KEY and isinstance(key, str)):
+            return False
+        # ключ мог прийти из адреса с «+», превращённым в пробел, — такой тоже принимаем
+        key = key.strip().replace(" ", "+")
+        return hmac.compare_digest(key.encode(), OWNER_KEY.strip().encode())
     return pid in CHEAT_PROFILES
 KNIVES = ("default", "karambit", "butterfly", "skeleton", "stiletto", "m9")
 KNIFE_UNLOCK = {"default": 0, "stiletto": 50, "skeleton": 100, "karambit": 150, "butterfly": 200, "m9": 250}  # убийств до открытия
