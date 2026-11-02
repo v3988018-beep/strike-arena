@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Strike Arena</title>
+<link rel="stylesheet" href="style.css">
+<script>
+// Если игра на телефоне не запустилась — показываем причину прямо на экране (консоли там нет)
+(function () {
+  var shown = false;
+  // всё важное дублируем в окно сервера на ПК — так видно, что происходит на телефоне
+  var t0 = Date.now();
+  window.__log = function (msg) {
+    var text = '+' + ((Date.now() - t0) / 1000).toFixed(1) + 's ' + msg;
+    try { navigator.sendBeacon('/clientlog', text); } catch (e) {}
+  };
+  __log('страница открылась: ' + navigator.userAgent + ' экран ' + screen.width + 'x' + screen.height + ' dpr ' + devicePixelRatio);
+  // раз в 5 секунд: жива ли страница и сколько кадров успела нарисовать
+  var frames = 0;
+  (function count() { frames++; requestAnimationFrame(count); })();
+  setInterval(function () {
+    var st = '';
+    try { st = window.__state ? ' | ' + window.__state() : ''; } catch (e) { st = ' | state error ' + e.message; }
+    __log('жива, кадров за 5с: ' + frames + (window.__saReady ? '' : ' (скрипт игры ещё не готов)') + st);
+    frames = 0;
+  }, 5000);
+  addEventListener('pagehide', function () { __log('страница закрыта/скрыта'); });
+  function report(msg) {
+    __log('ОШИБКА: ' + msg);
+    if (shown) return; shown = true;
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:9999;background:#400;color:#fff;font:14px/1.4 sans-serif;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-word';
+    box.textContent = '⚠ Игра не запустилась:\n' + msg + '\n\nСфотографируй это и отправь Claude.';
+    (document.body || document.documentElement).appendChild(box);
+    // подробности для диагностики: версия браузера, что он умеет и какую строку файла он получил
+    var can = function (code) { try { new Function(code); return '+'; } catch (e) { return '-'; } };
+    var extra = '\n\n' + navigator.userAgent + '\n?? ' + can('var a = 1 ?? 2') + '  ?. ' + can('var a = {}; a?.b') + '  ??= ' + can('var a; a ??= 1');
+    var m = /(https?:\/\/[^\s:]+(?::\d+)?\/[^\s:]+):(\d+)/.exec(msg);
+    if (!m) { box.textContent += extra; return; }
+    fetch(m[1], { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+      var lines = t.split(/\r\n|\n|\r/), n = +m[2];
+      box.textContent += extra + '\nстрок: ' + lines.length + '\n' + (n - 1) + ': ' + lines[n - 2] + '\n' + n + ': ' + lines[n - 1];
+    }).catch(function () { box.textContent += extra; });
+  }
+  addEventListener('error', function (e) {
+    // картинки и звуки, которые не загрузились, игре не мешают — ловим только ошибки скриптов
+    if (!(e instanceof ErrorEvent) && !(e.target && e.target.tagName === 'SCRIPT')) return;
+    report((e.message || 'ошибка загрузки') + (e.filename ? '\n' + e.filename + ':' + e.lineno : '')); }, true);
+  addEventListener('unhandledrejection', function (e) { report(String(e.reason && (e.reason.stack || e.reason.message) || e.reason)); });
+  setTimeout(function () { if (!window.__saReady) report('скрипт игры не загрузился за 15 секунд.\n' + navigator.userAgent); }, 15000);
+})();
+</script>
+</head>
+<body>
+<!-- Главное меню: сверху вкладки, слева панель вкладки, на фоне карта и персонаж (рисуются в 3D) -->
+<div id="menu">
+  <header class="topbar">
+    <div class="logo">STRIKE <span>ARENA</span></div>
+    <nav class="tabs">
+      <button data-tab="play" class="active">Играть</button>
+      <button data-tab="inventory">Инвентарь</button>
+      <button data-tab="shop">Магазин</button>
+      <button data-tab="profile">Профиль</button>
+      <button id="menuOptionsBtn">Настройки</button>
+    </nav>
+    <div id="levelChip" title="Уровень профиля">⭐ 1</div>
+    <div id="goldBalance" title="Золото: за убийства, победы и MVP">🪙 0</div>
+    <input id="nameInput" maxlength="16" placeholder="Твой ник" autocomplete="off">
+  </header>
+
+  <!-- ИГРАТЬ -->
+  <section class="sidePanel" id="tab-play">
+    <h2>Играть</h2>
+    <p class="sub">Командный бой до 6×6 · раунды до <b id="winScore">8</b> побед</p>
+    <div class="optLabel">Где играть</div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="online">Онлайн<small>общий сервер</small></button>
+      <button data-mode="solo">С ботами<small>оффлайн, только ты</small></button>
+      <button data-mode="lobby">1 на 1<small>лобби с другом</small></button>
+    </div>
+    <div id="commonOptions">
+      <div class="optLabel">Карта</div>
+      <div class="mapGrid" id="mapGrid"></div>
+      <div class="optLabel">Режим игры</div>
+      <div class="seg" id="gameModeSeg">
+        <button data-gm="bomb">💣 Закладка бомбы<small>заложить или разминировать</small></button>
+        <button data-gm="tdm">Командный бой<small>убить всех противников</small></button>
+      </div>
+    </div>
+    <!-- Лобби 1 на 1: создать, войти по коду, настройки матча -->
+    <div id="lobbyOptions" class="hidden">
+      <div id="lobbyNone">
+        <button id="lobbyCreateBtn" class="bigGhost">＋ Создать лобби</button>
+        <div class="optLabel">Или войти по коду</div>
+        <div class="inlineForm"><input id="lobbyCodeInput" maxlength="5" placeholder="КОД" autocomplete="off"><button id="lobbyJoinBtn">Войти</button></div>
+      </div>
+      <div id="lobbyIn" class="hidden">
+        <div class="lobbyHead">
+          <div>Код лобби <b id="lobbyCode"></b></div>
+          <button id="lobbyCopyBtn" class="ghostBtn small">Копировать</button>
+          <button id="lobbyLeaveBtn" class="ghostBtn small">Выйти</button>
+        </div>
+        <div class="lobbyVs"><div class="lobbySlot ct" id="lobbySlot0"></div><span>VS</span><div class="lobbySlot t" id="lobbySlot1"></div></div>
+        <div id="lobbyInviteBox">
+          <div class="optLabel">Позвать друга</div>
+          <div class="inviteList" id="lobbyInviteList"></div>
+        </div>
+        <div class="optLabel">Правила матча <small id="lobbyHostNote"></small></div>
+        <div id="lobbyRules"></div>
+      </div>
+    </div>
+    <div id="soloOptions">
+      <div class="optLabel">Сложность ботов</div>
+      <div class="seg diff" id="diffSeg">
+        <button data-diff="easy">Лёгкий</button>
+        <button data-diff="normal">Средний</button>
+        <button data-diff="hard">Сложный</button>
+        <button data-diff="expert">Эксперт</button>
+      </div>
+      <p class="diffInfo" id="diffInfo"></p>
+      <div class="optLabel">Размер команд</div>
+      <div class="seg" id="sizeSeg">
+        <button data-size="1">1×1</button><button data-size="2">2×2</button><button data-size="3">3×3</button>
+        <button data-size="4">4×4</button><button data-size="5">5×5</button><button data-size="6">6×6</button>
+      </div>
+    </div>
+
+    <details class="controlsBox">
+      <summary>Управление</summary>
+      <div class="controls">
+      <div><kbd>WASD</kbd> движение</div><div><kbd>Пробел</kbd> прыжок</div>
+      <div><kbd>Shift</kbd> тихий шаг</div><div><kbd>Ctrl</kbd>/<kbd>C</kbd> присесть</div>
+      <div><kbd>ЛКМ</kbd> стрельба</div><div><kbd>F</kbd> осмотр оружия</div>
+      <div><kbd>ПКМ</kbd> прицел</div><div><kbd>R</kbd> перезарядка</div>
+      <div><kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> основное, пистолет, нож</div><div><kbd>Tab</kbd> таблица</div>
+      <div><kbd>T</kbd> чат</div><div><kbd>M</kbd> сменить команду</div>
+      <div><kbd>F11</kbd> полный экран</div><div><kbd>K</kbd> <kbd>K</kbd> выход в меню</div>
+      <div><kbd>Esc</kbd> пауза и настройки</div><div><kbd>H</kbd> сменить руку</div>
+      <div><kbd>E</kbd> (держать) заложить / разминировать бомбу</div>
+      <div><kbd>B</kbd> магазин (в начале раунда)</div><div><kbd>4</kbd> гранаты: ЛКМ — далеко, ПКМ — близко</div>
+      <div><kbd>ПКМ</kbd> с AWP — прицел (2 уровня)</div>
+      <div><kbd>G</kbd> выбросить оружие (подобрать — пройти рядом)</div>
+      <div><kbd>E</kbd> поднять оружие, на которое смотришь (поменять на своё)</div>
+      <div><kbd>Пробел</kbd> зажать + <kbd>A</kbd>/<kbd>D</kbd> и мышь в ту же сторону — бхоп</div>
+      </div>
+      <p class="botHint">Ботов можно менять прямо в игре, в чате:<br><kbd>/bots 0–6</kbd> размер команд · <kbd>/diff easy | normal | hard | expert</kbd><br>
+      <kbd>/map desert | warehouse | village | canyon</kbd> сменить карту · <kbd>/mode bomb | tdm</kbd> режим</p>
+    </details>
+  </section>
+
+  <!-- ИНВЕНТАРЬ -->
+  <section class="sidePanel hidden" id="tab-inventory">
+    <h2>Инвентарь</h2>
+    <div class="optLabel">Персонаж</div>
+    <div class="seg" id="agentSeg">
+      <button data-team="ct">Спецназ</button><button data-team="t">Террорист</button>
+    </div>
+    <div class="skinPick" id="agentSkinPick"></div>
+    <div class="optLabel">Оружие — выбери, чтобы сменить скин</div>
+    <div class="invGrid" id="gunGrid"></div>
+    <div class="skinPick" id="gunSkinPick"></div>
+    <div class="optLabel">Нож <span id="knifeName"></span></div>
+    <div class="invGrid" id="knifeSeg"></div>
+    <div class="optLabel">Окраска ножа</div>
+    <div class="skinPick" id="knifeSkinPick"></div>
+  </section>
+
+  <!-- МАГАЗИН -->
+  <section class="sidePanel hidden" id="tab-shop">
+    <h2>Магазин</h2>
+    <p class="sub">🪙 Золото даётся за игру: убийства, помощь, победы в раундах, MVP и победу в матче.
+      Нажми на скин, чтобы примерить его на персонаже.</p>
+    <div class="dailyCard" id="dailyCard">
+      <div class="dailyIcon">🎁</div>
+      <div class="dailyText"><b>Ежедневная награда</b><small id="dailyInfo"></small></div>
+      <button id="dailyBtn"></button>
+    </div>
+    <div class="optLabel">Кейсы</div>
+    <div class="caseGrid" id="caseGrid"></div>
+    <div class="optLabel">Скины</div>
+    <div class="seg mini" id="shopFilter">
+      <button data-w="all">Все</button><button data-w="rifle">AKR</button><button data-w="awp">AWP</button>
+      <button data-w="m4">M4</button><button data-w="smg">MP5</button><button data-w="shotgun">Nova</button>
+      <button data-w="pistol">USP</button><button data-w="deagle">Deagle</button><button data-w="knife">Ножи</button><button data-w="agent">Агенты</button>
+    </div>
+    <div class="skinGrid" id="skinGrid"></div>
+  </section>
+
+  <!-- ПРОФИЛЬ И ДРУЗЬЯ -->
+  <section class="sidePanel hidden" id="tab-profile">
+    <h2>Профиль</h2>
+    <div class="profileCard">
+      <div class="avatar" id="profAvatar">?</div>
+      <div class="profName"><b id="profName">…</b><small>Твой код для друзей: <span id="profCode">…</span></small></div>
+      <button id="profCopyBtn" class="ghostBtn small">Копировать</button>
+    </div>
+    <div class="levelBox">
+      <div class="levelRow"><b id="profLevel">Уровень 1</b><small id="profXp"></small></div>
+      <div class="xpBar"><div id="xpFill"></div></div>
+      <small id="nextReward"></small>
+    </div>
+    <div class="rankBox"><span class="rankIcon" id="rankIcon">🎖</span><div><b id="profRank"></b><small id="profElo"></small></div></div>
+    <div class="statGrid" id="statGrid"></div>
+    <div class="optLabel">Задания дня <small id="missionsReset"></small></div>
+    <div id="missionList"></div>
+    <div class="optLabel">Достижения <small id="achCount"></small></div>
+    <div class="achGrid" id="achGrid"></div>
+    <div class="optLabel">Таблица лидеров</div>
+    <div class="seg mini" id="leaderSeg"><button data-l="duel">Рейтинг 1 на 1</button><button data-l="level">Уровень</button></div>
+    <div id="leaderList"></div>
+    <div class="optLabel">Добавить друга</div>
+    <div class="inlineForm"><input id="friendCodeInput" maxlength="24" placeholder="Ник#1234 или просто 1234" autocomplete="off"><button id="friendAddBtn">Добавить</button></div>
+    <div id="requestsBox"></div>
+    <div class="optLabel">Друзья <small id="friendsCount"></small></div>
+    <div class="friendList" id="friendList"></div>
+    <p class="sub" id="socialOffline"></p>
+  </section>
+
+  <!-- Открытие кейса: лента-рулетка -->
+  <div id="caseOpen" class="hidden">
+    <div class="caseBox">
+      <h3 id="caseTitle"></h3>
+      <div id="caseInfo">
+        <div class="caseOdds" id="caseOdds"></div>
+        <div class="caseItems" id="caseItems"></div>
+        <div class="caseBtns"><button id="caseCancel">Назад</button><button id="caseSpin"></button></div>
+      </div>
+      <div class="reel"><div class="reelStrip" id="reelStrip"></div><div class="reelMarker"></div></div>
+      <div id="caseResult"></div>
+      <button id="caseClose" class="hidden">Забрать</button>
+    </div>
+  </div>
+
+  <div class="playArea">
+    <p id="status"></p>
+    <button id="playBtn">ИГРАТЬ</button>
+  </div>
+</div>
+
+<!-- Интерфейс в игре -->
+<div id="hud" class="hidden">
+  <div id="scope" class="hidden"><i></i><i></i></div>  <!-- прицел AWP — под остальным интерфейсом -->
+  <!-- Управление для телефона: слева джойстик, справа — обзор пальцем и кнопки -->
+  <div id="touchUI" class="hidden">
+    <div id="joyZone"></div>
+    <div id="lookPad"></div>
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <button class="tb fire" data-t="fire">🔥</button>
+    <button class="tb fire2" data-t="fire">🔥</button>
+    <button class="tb aim" data-t="aim">🎯</button>
+    <button class="tb jump" data-t="jump">⤒</button>
+    <button class="tb crouch" data-t="crouch">⤓</button>
+    <button class="tb reload" data-t="reload">⟳</button>
+    <button class="tb switch" data-t="switch">⇄</button>
+    <button class="tb use" data-t="use">E</button>
+    <button class="tb nade" data-t="nade">💣</button>
+    <button class="tb c4 hidden" id="tbC4" data-t="c4">C4</button>
+    <div class="ttop">
+      <button data-t="buy">🛒</button><button data-t="score">📋</button><button data-t="drop">G</button>
+      <button data-t="inspect">F</button><button data-t="menu">⏻</button>
+    </div>
+  </div>
+  <div id="rotateHint">
+    <div class="rhText">📱↻ Поверни телефон горизонтально</div>
+    <div class="rhSub">Если экран не поворачивается — включи автоповорот в шторке телефона</div>
+    <button id="rhRotate">↻ Повернуть экран</button>
+    <button id="rhPortrait">Играть вертикально</button>
+    <button id="rhLeave">✕ Выйти в меню</button>
+  </div>
+  <div id="topScore">
+    <div class="alive ct" id="aliveCT"></div>
+    <div class="team ct"><span id="scoreCT">0</span></div>
+    <div class="vs"><div id="roundTimer">РАЗМИНКА</div><small>до <span id="winScore2">8</span> побед</small></div>
+    <div class="team t"><span id="scoreT">0</span></div>
+    <div class="alive t" id="aliveT"></div>
+  </div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="hitmarker"></div>
+  <div id="actionBar" class="hidden"><div id="actionLabel"></div><div class="track"><div id="actionFill"></div></div></div>
+  <div id="bombHint" class="hidden"></div>
+  <div id="pickHint" class="hidden"></div>
+  <div id="killNotice"></div>
+  <div id="killfeed"></div>
+  <div id="chat"><div id="chatLog"></div><input id="chatInput" maxlength="120" class="hidden" placeholder="Сообщение..."></div>
+  <div id="bottomLeft">
+    <div id="buyHint"></div>
+    <div class="moneyRow"><span id="money">$ 800</span><span id="moneyDelta"></span><span id="goldDelta"></span><span id="xpDelta"></span></div>
+    <div class="hp"><span class="icon">✚</span><span id="hp">100</span><span id="armorIcon"></span></div>
+  </div>
+  <div id="bottomRight">
+    <div id="slots"></div>
+    <div id="weaponName">AKR</div>
+    <div class="ammo"><span id="ammo">30</span><small>/ <span id="reserve">90</span></small></div>
+    <div id="reloadBar"><div></div></div>
+  </div>
+  <div id="teamBadge"></div>
+  <div id="cheatBadge" class="hidden"></div>
+  <!-- Итоги матча (показываются в паузе между матчами) -->
+  <div id="matchSummary" class="hidden">
+    <div class="msBox">
+      <h2 id="msTitle"></h2>
+      <div class="msScore" id="msScore"></div>
+      <div class="msMvp" id="msMvp"></div>
+      <table class="msTable"><thead><tr><th>Игрок</th><th title="Убийства">У</th><th title="Помощь">П</th><th title="Смерти">С</th><th title="MVP раунда">★</th><th title="Процент хедшотов">ХС%</th><th>XP</th></tr></thead><tbody id="msBody"></tbody></table>
+      <div class="msRewards" id="msRewards"></div>
+      <small class="msNote">Новый матч начнётся через несколько секунд</small>
+    </div>
+  </div>
+  <!-- Панель читов владельца (F6) -->
+  <div id="cheatPanel" class="hidden">
+    <div class="cheatHead"><b>🛠 Инструменты</b><small>F6 или Esc — закрыть · у тебя в таблице видна метка 🛠</small></div>
+    <div id="cheatToggles"></div>
+    <label class="cheatSpeedRow">🏃 Скорость <input type="range" id="cheatSpeed" min="0.5" max="4" step="0.25"><output id="cheatSpeedVal"></output></label>
+    <div class="cheatBtns"><button id="cheatAllOff">Выключить всё</button><button id="cheatClose">Готово</button></div>
+  </div>
+  <div id="damageFlash"></div>
+  <div id="deathScreen" class="hidden">
+    <div id="deathText"></div>
+    <div id="respawnText"></div>
+  </div>
+  <div id="banner" class="hidden"></div>
+  <div id="scoreboard" class="hidden">
+    <table>
+      <thead><tr><th colspan="5" class="ct">Спецназ (CT)</th></tr><tr><th>Игрок</th><th title="Убийства">У</th><th title="Помощь">П</th><th title="Смерти">С</th><th title="MVP раунда">★</th></tr></thead>
+      <tbody id="sbCT"></tbody>
+    </table>
+    <table>
+      <thead><tr><th colspan="5" class="t">Террористы (T)</th></tr><tr><th>Игрок</th><th title="Убийства">У</th><th title="Помощь">П</th><th title="Смерти">С</th><th title="MVP раунда">★</th></tr></thead>
+      <tbody id="sbT"></tbody>
+    </table>
+  </div>
+  <div id="teamMenu" class="hidden">
+    <h2>Выбери команду</h2>
+    <div class="teamButtons">
+      <button data-team="ct" class="ct">Спецназ<small>CT</small></button>
+      <button data-team="t" class="t">Террористы<small>T</small></button>
+    </div>
+    <p><kbd>M</kbd> или <kbd>Esc</kbd> — закрыть</p>
+  </div>
+  <div id="pauseHint" class="hidden">
+    <div class="pauseTitle">Пауза</div>
+    <button id="resumeBtn">Продолжить</button>
+    <button id="pauseOptionsBtn" class="ghostBtn">⚙ Настройки</button>
+    <div class="pauseNote">или кликни по экрану</div>
+    <div class="pauseLabel">Игроки в матче — нажми, чтобы открыть профиль</div>
+    <div id="pausePlayers"></div>
+  </div>
+  <div id="fps" class="hidden">0 FPS</div>
+  <canvas id="radar" width="200" height="200"></canvas>
+  <div id="flashOverlay"></div>
+  <!-- Магазин (B) -->
+  <div id="buyMenu" class="hidden">
+    <div class="buyHead"><b>Магазин</b><span id="buyMoney">$ 0</span><small>B или Esc — закрыть</small></div>
+    <div id="buyGrid"></div>
+  </div>
+</div>
+
+<!-- Настройки (открываются из меню и из паузы) -->
+<div id="options" class="hidden">
+  <div class="panel optPanel">
+    <h2>Настройки</h2>
+
+    <h3 data-no-i18n>Язык · Language</h3>
+    <div class="seg mini" id="o_lang" data-no-i18n></div>
+
+    <h3>Звук</h3>
+    <label class="row">Общая громкость <input type="range" id="o_volume" min="0" max="100" step="1"><output></output></label>
+    <label class="row">Громкость выстрелов <input type="range" id="o_shotVolume" min="0" max="150" step="5"><output></output></label>
+
+    <h3>Графика</h3>
+    <div class="row">Качество
+      <div class="seg mini" id="o_quality">
+        <button data-v="low">Низкое</button><button data-v="medium">Среднее</button><button data-v="high">Высокое</button>
+      </div>
+    </div>
+    <p class="hint" id="qualityInfo"></p>
+    <label class="row">Поле зрения (FOV) <input type="range" id="o_fov" min="60" max="100" step="1"><output></output></label>
+    <label class="row check">Показывать FPS <input type="checkbox" id="o_showFps"></label>
+
+    <h3>Управление</h3>
+    <label class="row">Чувствительность мыши <input type="range" id="o_sens" min="0.1" max="4" step="0.05"><output></output></label>
+    <label class="row">Чувствительность в прицеле <input type="range" id="o_adsSens" min="0.1" max="1.5" step="0.05"><output></output></label>
+    <label class="row check">Инвертировать мышь по вертикали <input type="checkbox" id="o_invertY"></label>
+    <label class="row check">Оружие в левой руке (клавиша H) <input type="checkbox" id="o_leftHand"></label>
+
+    <h3>Прицел</h3>
+    <div class="row">Цвет
+      <div class="seg mini colors" id="o_xhColor">
+        <button data-v="#3cff6e" style="--c:#3cff6e"></button><button data-v="#ff3b3b" style="--c:#ff3b3b"></button>
+        <button data-v="#ffffff" style="--c:#ffffff"></button><button data-v="#ffe14d" style="--c:#ffe14d"></button>
+        <button data-v="#40e0ff" style="--c:#40e0ff"></button><button data-v="#ff5cf0" style="--c:#ff5cf0"></button>
+      </div>
+    </div>
+    <label class="row">Размер <input type="range" id="o_xhSize" min="3" max="16" step="1"><output></output></label>
+    <div class="xhPreview"><div class="xh"><i></i><i></i><i></i><i></i></div></div>
+
+    <div class="optButtons">
+      <button id="optResetBtn" class="ghostBtn">Сбросить</button>
+      <button id="optDoneBtn">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- Осмотр оружия в 3D: тянуть мышью — вращать, колёсико — приблизить -->
+<div id="inspect3d" class="hidden">
+  <div class="inspectBox">
+    <div class="inspectHead"><div><b id="insName"></b><small id="insSub"></small></div><button id="insClose">✕</button></div>
+    <div class="inspectView"><canvas id="insCanvas"></canvas><div class="insHint">Тяни мышью — вращать · колёсико — приблизить · двойной клик — сбросить</div></div>
+    <div class="skinPick" id="insSkins"></div>
+  </div>
+</div>
+
+<!-- Уведомления: заявки в друзья, приглашения в лобби (видны и в меню, и в игре) -->
+<div id="toasts"></div>
+
+<!-- Профиль другого игрока (из паузы в игре или из списка друзей) -->
+<div id="playerCard" class="hidden">
+  <div class="cardBox">
+    <div class="profileCard">
+      <div class="avatar" id="pcAvatar"></div>
+      <div class="profName"><b id="pcName"></b><small id="pcStatus"></small></div>
+    </div>
+    <div class="statGrid" id="pcStats"></div>
+    <div class="caseBtns"><button id="pcClose">Закрыть</button><button id="pcAction"></button></div>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script type="module" src="game.js"></script>
+</body>
+</html>

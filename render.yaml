@@ -1,0 +1,13 @@
+# Настройки для бесплатного хостинга Render (render.com): New → Blueprint → выбрать этот репозиторий
+services:
+  - type: web
+    name: strike-arena
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u server.py
+    envVars:
+      - key: PYTHON_VERSION   # та же версия, что и дома (файл .python-version через сайт GitHub не загружается)
+        value: 3.13.1
+      - key: OWNER_KEY        # секретный ключ владельца для читов — Render придумает его сам
+        generateValue: true
