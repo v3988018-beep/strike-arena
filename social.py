@@ -22,6 +22,33 @@ from aiohttp import web, WSMsgType
 DATA_FILE = Path(__file__).parent / "data" / "profiles.json"
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DB_SAVE_DELAY = 3.0    # изменения копятся и пишутся в базу одной записью раз в несколько секунд
+# Вход через Google: номер приложения из Google Cloud (он не секретный — виден в коде страницы)
+GOOGLE_CLIENT_ID = os.environ.get(
+    "GOOGLE_CLIENT_ID", "510296852748-vv4kuqedvrc491738nmpg0qgofdodkkc.apps.googleusercontent.com").strip()
+GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
+WALLET_MAX = 64_000    # кошелёк (золото, скины, кейсы) — не больше стольких символов JSON
+
+
+async def verify_google(credential):
+    """Проверить у Google, что вход настоящий и именно в нашу игру. Возвращает номер аккаунта (sub) или None."""
+    import aiohttp
+    if not GOOGLE_CLIENT_ID or not isinstance(credential, str) or len(credential) > 4096:
+        return None
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            async with s.get("https://oauth2.googleapis.com/tokeninfo", params={"id_token": credential}) as r:
+                if r.status != 200:
+                    return None
+                info = await r.json()
+    except Exception as e:
+        print(f"[google] не удалось проверить вход: {e!r}", flush=True)
+        return None
+    import time
+    if (info.get("aud") != GOOGLE_CLIENT_ID or info.get("iss") not in GOOGLE_ISSUERS
+            or int(info.get("exp", 0)) < time.time() or not info.get("sub")):
+        return None
+    return str(info["sub"])
 
 
 def db_dsn(url):
@@ -107,6 +134,7 @@ class Social:
         self.start_game = start_game      # server.py: создаёт игру лобби и возвращает имя комнаты
         self.profiles = {}                # id → профиль
         self.by_token = {}                # token → id
+        self.by_google = {}               # номер Google-аккаунта → id профиля
         self.sessions = {}                # id → множество соединений /social (вкладки браузера)
         self.in_game = set()              # кто сейчас в игре
         self.lobbies = {}                 # код → лобби
@@ -135,6 +163,8 @@ class Social:
             p.setdefault("ach", [])
             self.profiles[p["id"]] = p
             self.by_token[p["token"]] = p["id"]
+            if p.get("google"):
+                self.by_google[p["google"]] = p["id"]
 
     def save(self):
         if DATABASE_URL:
@@ -329,6 +359,7 @@ class Social:
         await self.send(pid, {"type": "me", "id": pid, "name": p["name"], "tag": p["tag"], "stats": p["stats"],
                               "level": level, "xpHave": have, "xpNeed": need,
                               "rank": rank_of(p["stats"].get("elo", START_ELO)), "ach": p.get("ach", []),
+                              "google": bool(p.get("google")),
                               "achList": [{"id": a, "name": n, "desc": d, "gold": g, "key": k, "need": need_}
                                           for a, n, d, k, need_, g in ACHIEVEMENTS]})
 
@@ -513,6 +544,36 @@ class Social:
             await self.send(m, {"type": "lobbyStart", "room": lobby["room"]})
 
     # ---------- соединение ----------
+    async def google_login(self, pid, ws, credential):
+        """Вход через Google. Аккаунт уже привязан к профилю — переключаем браузер на тот профиль
+        (так прогресс переезжает на новое устройство). Не привязан — привязываем к текущему."""
+        reply = lambda msg: ws.send_str(json.dumps({"type": "google", **msg}, ensure_ascii=False))
+        sub = await verify_google(credential)
+        if sub is None:
+            await reply({"ok": False})
+            return
+        other = self.by_google.get(sub)
+        if other == pid:
+            await reply({"ok": True, "linked": True})
+            return
+        if other is not None:
+            await reply({"ok": True, "switch": self.profiles[other]["token"]})
+            return
+        p = self.profiles[pid]
+        if p.get("google"):
+            # этот профиль уже принадлежит другому Google-аккаунту — новому аккаунту новый профиль
+            np = self.new_profile(p["name"])
+            np["google"] = sub
+            self.by_google[sub] = np["id"]
+            self.save()
+            await reply({"ok": True, "switch": np["token"], "fresh": True})
+            return
+        p["google"] = sub
+        self.by_google[sub] = pid
+        self.save()
+        await self.push_me(pid)
+        await reply({"ok": True, "linked": True})
+
     async def handler(self, request):
         ws = web.WebSocketResponse(heartbeat=15)
         await ws.prepare(request)
@@ -544,6 +605,9 @@ class Social:
                     self.check_achievements(pid)   # достижения за то, что уже сделано раньше
                     self.save()
                     await self.push_me(pid)
+                    # кошелёк из профиля: браузер возьмёт его, если он новее своего (или после входа через Google)
+                    await ws.send_str(json.dumps({"type": "wallet", "wallet": self.profiles[pid].get("wallet")},
+                                                 ensure_ascii=False))
                     await self.push_friends(pid)
                     lobby = self.lobbies.get(self.lobby_of.get(pid))
                     await ws.send_str(json.dumps({"type": "lobby", "lobby": lobby and self.lobby_public(lobby)}))
@@ -558,6 +622,14 @@ class Social:
                     self.save()
                     await self.push_me(pid)
                     await self.push_friends_of(pid)
+                elif kind == "wallet":
+                    # золото, скины, кейсы — копия в профиле, чтобы не пропали с очисткой браузера
+                    w = data.get("wallet")
+                    if isinstance(w, dict) and len(json.dumps(w, ensure_ascii=False)) <= WALLET_MAX:
+                        self.profiles[pid]["wallet"] = w
+                        self.save()
+                elif kind == "google":
+                    await self.google_login(pid, ws, data.get("credential"))
                 elif kind == "friendAdd":
                     await self.friend_add(pid, str(data.get("code", ""))[:24])
                 elif kind == "friendAccept":

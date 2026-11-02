@@ -19,6 +19,7 @@ from aiohttp import web, WSMsgType
 from bots import World, BotBrain, BOT_NAMES, DIFFICULTY, DIFFICULTY_NAME, HEAR_DIST
 from grenades import (Nade, DroppedGun, segment_hits_sphere, HE_RADIUS, HE_DAMAGE, FLASH_RANGE,
                       SMOKE_RADIUS, SMOKE_TIME)
+import social as social_mod
 from social import Social, rank_of
 
 # На хостинге (Render и т.п.) порт задаёт сам хостинг через переменную PORT — это и признак «сервер в интернете»
@@ -1344,6 +1345,8 @@ async def index(request):
     html = (PUBLIC_DIR / "index.html").read_text(encoding="utf-8")
     html = html.replace('href="style.css"', f'href="style.css?v={version}"')
     html = html.replace('src="game.js"', f'src="game.js?v={version}"')
+    # номер приложения для входа через Google (если он задан) — страница покажет кнопку входа
+    html = html.replace("</head>", f'<meta name="google-client-id" content="{social_mod.GOOGLE_CLIENT_ID}">\n</head>', 1)
     return web.Response(text=html, content_type="text/html")
 
 

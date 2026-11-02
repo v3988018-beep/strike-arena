@@ -250,6 +250,11 @@ svg.ic.jump { fill: #ffd84d; }
 .buyCat button:disabled { opacity: .45; cursor: default; }
 .buyCat button.owned { opacity: .7; border-color: #3f7a3f; }
 .buyCat button.sell { border-color: #3f7a3f; background: rgba(63,122,63,.25); }
+/* вход через Google в профиле */
+.googleBox { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.googleBox small { display: block; opacity: .75; margin-bottom: 8px; line-height: 1.35; }
+#googleIn { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9be29b; font-weight: 700; }
+#googleIn.hidden, #googleOut.hidden, .googleBox.hidden { display: none; }
 .buyCat button.sell .price { color: #9be29b; }
 .buyCat button svg { grid-column: 1 / -1; height: 24px; width: auto; justify-self: start; fill: #d5dbe6; margin-bottom: 4px; }
 .buyCat button span { font-size: 13px; font-weight: 700; }

@@ -203,6 +203,11 @@
     'У тебя бомба — отнеси её на точку A или B (C4 — взять в руки)': 'You have the bomb — take it to site A or B (C4 — take it in hand)',
     'Бомба в руках — G, чтобы выбросить (союзник подберёт), 1–3 — убрать': 'Bomb in hand — G to drop it (a teammate can pick it up), 1–3 to put it away',
     'Бомба в руках — G, чтобы выбросить (союзник подберёт)': 'Bomb in hand — G to drop it (a teammate can pick it up)',
+    'Войди через Google, чтобы прогресс, золото и скины не пропали и открывались на любом устройстве':
+      'Sign in with Google so your progress, gold and skins are never lost and work on any device',
+    '✓ Профиль привязан к Google': '✓ Profile linked to Google', 'Выйти': 'Sign out',
+    '✓ Профиль привязан к Google — прогресс сохранится': '✓ Profile linked to Google — your progress is saved',
+    'Не получилось войти через Google — попробуй ещё раз': "Couldn't sign in with Google — try again",
     '↩ продать': '↩ sell', '↩ продать +${0}': '↩ sell +${0}',
     '💣 {0} выбросил бомбу': '💣 {0} dropped the bomb', '💣 Ты подобрал бомбу': '💣 You picked up the bomb', 'Зажми E, чтобы разминировать': 'Hold E to defuse',
     'Бомба заложена на {0} — разминируй её!': 'The bomb is planted at {0} — defuse it!', 'Бомба выпала — подбери её': 'The bomb was dropped — pick it up',

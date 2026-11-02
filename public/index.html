@@ -197,6 +197,17 @@
       <div class="profName"><b id="profName">…</b><small>Твой код для друзей: <span id="profCode">…</span></small></div>
       <button id="profCopyBtn" class="ghostBtn small">Копировать</button>
     </div>
+    <!-- Вход через Google: прогресс, золото и скины не пропадут и откроются на другом устройстве -->
+    <div class="googleBox hidden" id="googleBox">
+      <div id="googleOut">
+        <small>Войди через Google, чтобы прогресс, золото и скины не пропали и открывались на любом устройстве</small>
+        <div id="googleBtn"></div>
+      </div>
+      <div id="googleIn" class="hidden">
+        <span>✓ Профиль привязан к Google</span>
+        <button id="googleLogout" class="ghostBtn small">Выйти</button>
+      </div>
+    </div>
     <div class="levelBox">
       <div class="levelRow"><b id="profLevel">Уровень 1</b><small id="profXp"></small></div>
       <div class="xpBar"><div id="xpFill"></div></div>

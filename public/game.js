@@ -1069,10 +1069,18 @@ wallet.owned = [...new Set(wallet.owned.map(oldKnife))].filter(id => SKIN_BY_ID[
 for (const w in wallet.equipped) wallet.equipped[w] = oldKnife(wallet.equipped[w]);
 if (wallet.equipped.knife) wallet.knifeSkins[SKIN_BY_ID[wallet.equipped.knife]?.knife || 'default'] ??= wallet.equipped.knife;
 for (const [w, id] of Object.entries(wallet.equipped)) if (!wallet.owned.includes(id)) delete wallet.equipped[w];
-function saveProfile() {
+// rev — номер версии кошелька: растёт с каждым изменением, по нему видно, где копия новее — в браузере или на сервере
+function saveProfile(changed = true) {
+  if (changed) { wallet.rev = (wallet.rev || 0) + 1; scheduleWalletUpload(); }
   try { localStorage.setItem('sa_profile', JSON.stringify(wallet)); } catch {}
   const el = document.getElementById('goldBalance');
   if (el) el.textContent = `🪙 ${wallet.gold}`;
+}
+// копия кошелька — в профиле на сервере (не чаще раза в пару секунд)
+let walletUploadTimer = null;
+function scheduleWalletUpload() {
+  clearTimeout(walletUploadTimer);
+  walletUploadTimer = setTimeout(() => socialSend({ type: 'wallet', wallet }), 1500);
 }
 // Какие скины надеты у меня — те же объекты, что в профиле
 let mySkins = wallet.equipped;
@@ -4740,10 +4748,49 @@ $('insClose').addEventListener('click', closeInspect);
 $('inspect3d').addEventListener('mousedown', e => { if (e.target.id === 'inspect3d') closeInspect(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInspect(); });
 
-saveProfile();
+saveProfile(false);
 refreshMyWeapons();
 renderShop();
 renderDaily();
+
+// ================== ВХОД ЧЕРЕЗ GOOGLE ==================
+// Кнопку рисует сама Google (скрипт accounts.google.com/gsi/client). Google присылает подписанный «пропуск»,
+// сервер проверяет его у Google и привязывает профиль к аккаунту — на другом устройстве профиль найдётся по нему
+const GOOGLE_CLIENT_ID = document.querySelector('meta[name="google-client-id"]')?.content || '';
+let googleReady = false;
+function initGoogle() {
+  if (!GOOGLE_CLIENT_ID || googleReady) return;
+  const s = document.createElement('script');
+  let lang = 'ru';
+  try { lang = localStorage.getItem('sa_lang') || 'ru'; } catch {}
+  s.src = `https://accounts.google.com/gsi/client?hl=${lang}`;   // язык кнопки — как в игре, а не как в системе
+  s.async = true;
+  s.onload = () => {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: r => socialSend({ type: 'google', credential: r.credential }),
+    });
+    google.accounts.id.renderButton($('googleBtn'), {
+      theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', locale: lang,
+    });
+    googleReady = true;
+  };
+  document.head.append(s);
+}
+function renderGoogle() {
+  // на адресе вида 192.168.x.x Google вход не разрешает — там кнопку не показываем
+  const allowed = GOOGLE_CLIENT_ID && (location.protocol === 'https:' || location.hostname === 'localhost');
+  $('googleBox').classList.toggle('hidden', !allowed || !profileMe);
+  if (!allowed || !profileMe) return;
+  $('googleOut').classList.toggle('hidden', !!profileMe.google);
+  $('googleIn').classList.toggle('hidden', !profileMe.google);
+  if (!profileMe.google) initGoogle();
+}
+$('googleLogout').addEventListener('click', () => {
+  if (!confirm('Выйти из профиля на этом устройстве? Прогресс останется в Google-аккаунте — войдёшь снова, и он вернётся.')) return;
+  try { for (const k of ['sa_token', 'sa_profile', 'sa_kills']) localStorage.removeItem(k); } catch {}
+  location.reload();
+});
 
 // ================== ПРОФИЛЬ, ДРУЗЬЯ, ЛОББИ ==================
 // Отдельное соединение /social живёт всё время, пока открыта страница (и в меню, и в игре)
@@ -4769,6 +4816,38 @@ function handleSocial(m) {
       socialToken = m.token;
       try { localStorage.setItem('sa_token', m.token); } catch {}
       break;
+    case 'wallet': {
+      // кошелёк из профиля на сервере. После входа через Google (force) берём серверный целиком —
+      // это прогресс аккаунта; иначе — тот, что новее. Если новее наш — отправляем его на сервер
+      let force = false;
+      try { force = localStorage.getItem('sa_wallet_force') === '1'; localStorage.removeItem('sa_wallet_force'); } catch {}
+      const w = m.wallet;
+      if (force || (w && (w.rev || 0) > (wallet.rev || 0))) {
+        try {
+          if (w) localStorage.setItem('sa_profile', JSON.stringify(w));
+          else localStorage.removeItem('sa_profile');   // у аккаунта ещё нет кошелька — начинаем с нуля
+        } catch {}
+        if (!inGame) location.reload();   // проще всего перерисовать всё заново
+        break;
+      }
+      if (!w || (wallet.rev || 0) > (w.rev || 0)) socialSend({ type: 'wallet', wallet });
+      break;
+    }
+    case 'google':
+      if (m.switch) {
+        // этот Google-аккаунт уже привязан к другому профилю — переходим на него (вместе с его кошельком)
+        try {
+          localStorage.setItem('sa_token', m.switch);
+          localStorage.setItem('sa_wallet_force', '1');
+          localStorage.removeItem('sa_kills');
+        } catch {}
+        location.reload();
+      } else if (m.ok) {
+        toast('✓ Профиль привязан к Google — прогресс сохранится', null, 4000);
+      } else {
+        toast('Не получилось войти через Google — попробуй ещё раз', null, 4000);
+      }
+      break;
     case 'me': {
       const before = knownKills;
       profileMe = m;
@@ -4785,6 +4864,7 @@ function handleSocial(m) {
       if (!inGame) { validateKnife(); renderMenu(); refreshMyWeapons(); }
       onLevel(m);
       renderProfile();
+      renderGoogle();
       renderRankAndAch();
       renderKnives();
       renderInventory();
@@ -5240,7 +5320,7 @@ showMenuAgent(settings.agent, 'rifle');
 
 // Для отладки: http://localhost:8080/?debug — доступ к игроку и стрельбе из консоли
 if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startInspect, viewModels, knifeAttack, switchWeapon, setKnifeModel, playAnim, KNIFE_POSE, tick,
-  setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene,
+  setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t) {
