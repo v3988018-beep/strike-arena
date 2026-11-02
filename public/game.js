@@ -4121,7 +4121,7 @@ function skinCard(s) {
     sub.textContent += ' · 🔒';
     card.classList.add('lockedKnife');
   }
-  if (!isAgent(s)) {  // 🔍 — осмотреть в 3D
+  {  // 🔍 — осмотреть в 3D (оружие, нож или агента целиком)
     const look = document.createElement('button');
     look.className = 'insBtn';
     look.title = 'Осмотреть в 3D';
@@ -4410,11 +4410,11 @@ function renderInventory() {
       });
       el.append(b);
     }
-    if (item) {  // оружие и нож можно осмотреть в 3D с надетым скином
+    {  // оружие, нож и агента можно осмотреть в 3D с надетым скином
       const look = document.createElement('button');
       look.className = 'insOpen';
       look.textContent = '🔍 Осмотреть в 3D';
-      look.addEventListener('click', () => openInspect(item, mySkins[weapon] || null));
+      look.addEventListener('click', () => openInspect(item || weapon, mySkins[weapon] || null));
       el.append(look);
     }
     if (!mine.length) {
@@ -4711,23 +4711,34 @@ function initInspect() {
   canvas.addEventListener('dblclick', reset);
 }
 
-// item — 'rifle' / 'awp' / 'pistol' / 'deagle' или тип ножа; skinId — скин или null (стандарт)
+// item — 'rifle' / 'awp' / 'pistol' / 'deagle', тип ножа или 'agent_ct' / 'agent_t' (персонаж);
+// skinId — скин или null (стандарт)
 function openInspect(item, skinId = null) {
   if (!ins) initInspect();
-  const knife = !!KNIVES[item];
+  const knife = !!KNIVES[item], agent = item.startsWith('agent_');
   const skin = skinId && SKIN_BY_ID[skinId];
-  // модель: пушки смотрят стволом в -z, ножи лежат в плоскости xy — разворачиваем боком к камере
+  // модель: пушки смотрят стволом в -z, ножи лежат в плоскости xy — разворачиваем боком к камере;
+  // агент — целиком, тот же, что в игре, с автоматом в руках
+  for (const old of ins.pivot.children) freeGeometry(old);
   ins.pivot.clear();
-  const inner = new THREE.Group();
-  if (knife) buildKnife(item, inner);
-  else GUN_BUILDERS[item](inner);
-  applySkin(inner, item, skinId);
-  if (!knife) inner.rotation.y = -Math.PI / 2;
+  let inner;
+  if (agent) {
+    inner = buildAgent(item.slice(6), skinId);
+    setAgentItem(inner, 'rifle', true, mySkins.rifle);
+    inner.rotation.y = Math.PI;   // лицом к камере
+  } else {
+    inner = new THREE.Group();
+    if (knife) buildKnife(item, inner);
+    else GUN_BUILDERS[item](inner);
+    applySkin(inner, item, skinId);
+    if (!knife) inner.rotation.y = -Math.PI / 2;
+  }
   const holder = new THREE.Group();
   holder.add(inner);
   const bbox = new THREE.Box3().setFromObject(holder);
   const size = bbox.getSize(new THREE.Vector3());
-  const s = 1.8 / Math.max(size.x, size.y, size.z);   // любой предмет — примерно одного размера в окне
+  // любой предмет — примерно одного размера в окне; персонаж высокий — чуть меньше, чтобы влез целиком
+  const s = (agent ? 1.0 : 1.8) / Math.max(size.x, size.y, size.z);
   holder.scale.setScalar(s);
   holder.position.copy(bbox.getCenter(new THREE.Vector3())).multiplyScalar(-s);
   ins.pivot.add(holder);
@@ -4737,7 +4748,7 @@ function openInspect(item, skinId = null) {
   $('insName').textContent = `${name} | ${skin ? skin.name : 'Стандарт'}`;
   $('insSub').textContent = skin ? RARITY[skin.rarity].name + (wallet.owned.includes(skin.id) ? ' · есть у тебя' : '') : 'Без скина';
   $('inspect3d').style.setProperty('--rar', skin ? RARITY[skin.rarity].color : '#3a4a66');
-  // все скины этого оружия — переключать прямо здесь
+  // все скины этого оружия (или агенты этой команды) — переключать прямо здесь
   const chips = $('insSkins');
   chips.textContent = '';
   for (const s2 of [null, ...SKINS.filter(x => knife ? x.knife === item : x.weapon === item)]) {
