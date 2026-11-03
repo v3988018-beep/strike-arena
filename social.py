@@ -75,7 +75,9 @@ LOBBY_OPTIONS = {
     "headshot": [False, True],
     "money": ["normal", "unlimited"],
     "nades": [True, False],
+    "bots": [False, True],                         # боты добивают команды до размера большей
 }
+LOBBY_MAX, LOBBY_TEAM_MAX = 10, 5                  # лобби — до 5 на 5
 
 
 # Уровни: на 1-й → 2-й нужно 300 опыта, дальше каждый уровень на 100 дороже
@@ -514,7 +516,11 @@ class Social:
 
     def lobby_public(self, lobby):
         return {"code": lobby["code"], "host": lobby["host"], "settings": lobby["settings"],
-                "members": [self.card(m) for m in lobby["members"]], "inGame": lobby["room"] is not None}
+                "members": [{**self.card(m), "team": lobby["teams"].get(m, "ct")} for m in lobby["members"]],
+                "inGame": lobby["room"] is not None, "max": LOBBY_MAX, "teamMax": LOBBY_TEAM_MAX}
+
+    def lobby_count(self, lobby, team):
+        return sum(1 for m in lobby["members"] if lobby["teams"].get(m) == team)
 
     async def push_lobby(self, lobby):
         for m in lobby["members"]:
@@ -598,7 +604,7 @@ class Social:
     async def lobby_create(self, pid):
         await self.lobby_leave(pid)
         code = self.new_code()
-        lobby = {"code": code, "host": pid, "members": [pid],
+        lobby = {"code": code, "host": pid, "members": [pid], "teams": {pid: "ct"},
                  "settings": default_settings(self.default_map), "room": None}
         self.lobbies[code] = lobby
         self.lobby_of[pid] = code
@@ -612,12 +618,14 @@ class Social:
             return await self.notice(pid, "Лобби с таким кодом нет")
         if pid in lobby["members"]:
             return
-        if len(lobby["members"]) >= 2:
-            return await self.notice(pid, "Лобби уже заполнено (1 на 1)")
+        if len(lobby["members"]) >= LOBBY_MAX:
+            return await self.notice(pid, f"Лобби уже заполнено ({LOBBY_TEAM_MAX} на {LOBBY_TEAM_MAX})")
         if lobby["room"]:
             return await self.notice(pid, "В этом лобби уже идёт игра")
         await self.lobby_leave(pid)
         lobby["members"].append(pid)
+        # новичок — в команду, где меньше игроков
+        lobby["teams"][pid] = "t" if self.lobby_count(lobby, "t") < self.lobby_count(lobby, "ct") else "ct"
         self.lobby_of[pid] = lobby["code"]
         await self.push_lobby(lobby)
         await self.push_friends_of(pid)
@@ -628,6 +636,7 @@ class Social:
         if not lobby:
             return
         lobby["members"].remove(pid)
+        lobby["teams"].pop(pid, None)
         await self.send(pid, {"type": "lobby", "lobby": None})
         if not lobby["members"]:
             del self.lobbies[code]
@@ -646,11 +655,29 @@ class Social:
         if oid not in self.sessions:
             return await self.notice(pid, "Друг не в сети")
         lobby = self.lobbies.get(self.lobby_of.get(pid)) or await self.lobby_create(pid)
-        if len(lobby["members"]) >= 2:
-            return await self.notice(pid, "В лобби уже двое")
+        if len(lobby["members"]) >= LOBBY_MAX:
+            return await self.notice(pid, "Лобби уже заполнено")
         await self.send(oid, {"type": "invite", "code": lobby["code"],
                               "from": {"id": pid, "name": me["name"], "tag": me["tag"]}})
         await self.notice(pid, f"Приглашение отправлено: {self.profiles[oid]['name']}")
+
+    async def lobby_team(self, pid, team):
+        """Перейти в другую команду лобби (если там есть место)."""
+        lobby = self.lobbies.get(self.lobby_of.get(pid))
+        if not lobby or lobby["room"] or team not in ("ct", "t") or lobby["teams"].get(pid) == team:
+            return
+        if self.lobby_count(lobby, team) >= LOBBY_TEAM_MAX:
+            return await self.notice(pid, "В этой команде уже нет мест")
+        lobby["teams"][pid] = team
+        await self.push_lobby(lobby)
+
+    async def lobby_kick(self, pid, oid):
+        """Хозяин убирает игрока из лобби."""
+        lobby = self.lobbies.get(self.lobby_of.get(pid))
+        if not lobby or lobby["host"] != pid or oid == pid or oid not in lobby["members"] or lobby["room"]:
+            return
+        await self.lobby_leave(oid)
+        await self.notice(oid, "Хозяин убрал тебя из лобби")
 
     async def lobby_settings(self, pid, new):
         lobby = self.lobbies.get(self.lobby_of.get(pid))
@@ -670,8 +697,9 @@ class Social:
             return
         if len(lobby["members"]) < 2:
             return await self.notice(pid, "Нужен второй игрок — пригласи друга или дай ему код лобби")
-        # хозяин — за спецназ, гость — за террористов
-        teams = {lobby["members"][0]: "ct", lobby["members"][1]: "t"}
+        teams = {m: lobby["teams"].get(m, "ct") for m in lobby["members"]}
+        if not lobby["settings"].get("bots") and len(set(teams.values())) < 2:
+            return await self.notice(pid, "В обеих командах должен быть хотя бы один игрок — или включи ботов")
         lobby["room"] = self.start_game(lobby["code"], dict(lobby["settings"]), teams)
         await self.push_lobby(lobby)
         for m in lobby["members"]:
@@ -964,6 +992,10 @@ class Social:
                     await self.lobby_settings(pid, data.get("settings"))
                 elif kind == "lobbyStart":
                     await self.lobby_start(pid)
+                elif kind == "lobbyTeam":
+                    await self.lobby_team(pid, data.get("team"))
+                elif kind == "lobbyKick":
+                    await self.lobby_kick(pid, str(data.get("id")))
         finally:
             if pid is not None:
                 conns = self.sessions.get(pid, set())

@@ -207,6 +207,17 @@
       'Sign in with Google so your progress, gold and skins are never lost and work on any device',
     '✓ Профиль привязан к Google': '✓ Profile linked to Google', 'Выйти': 'Sign out',
     'Политика конфиденциальности': 'Privacy policy',
+    // лобби до 5 на 5
+    'Лобби': 'Lobby', 'с друзьями, до 5 на 5': 'with friends, up to 5v5', '⇄ Перейти сюда': '⇄ Join this team', 'свободно': 'free', 'бот': 'bot',
+    'Спецназ {0}/{1}': 'Counter-Terrorists {0}/{1}', 'Террористы {0}/{1}': 'Terrorists {0}/{1}', 'Боты в пустые места': 'Bots in empty slots',
+    'ЖДЁМ ИГРОКОВ': 'WAITING FOR PLAYERS', 'НУЖНЫ ОБЕ КОМАНДЫ': 'BOTH TEAMS NEEDED', 'НАЧАТЬ {0} НА {1}': 'START {0} VS {1}',
+    'Позвать в лобби': 'Invite to lobby', 'Убрать из лобби': 'Remove from lobby', 'Лобби · {0}': 'Lobby · {0}',
+    '✉ {0} зовёт тебя в лобби': '✉ {0} invites you to a lobby', '✉ {0} зовёт тебя в лобби (код {1}) — выйди в меню: K K': '✉ {0} invites you to a lobby (code {1}) — go to the menu: K K',
+    'Нет друзей в сети. Скажи друзьям код лобби — они введут его во вкладке «Лобби».': 'No friends online. Tell your friends the lobby code — they enter it under “Lobby”.',
+    'Лобби уже заполнено (5 на 5)': 'The lobby is full (5v5)', 'Лобби уже заполнено': 'The lobby is full', 'В этой команде уже нет мест': 'That team is full',
+    'Хозяин убрал тебя из лобби': 'The host removed you from the lobby',
+    'В обеих командах должен быть хотя бы один игрок — или включи ботов': 'Each team needs at least one player — or turn on bots',
+    'В игре лобби команды не меняются — их выбирают в лобби': 'Teams are picked in the lobby and can’t be changed in game',
     // обмен
     'История обменов': 'Trade history', 'Обмен': 'Trade', '🔄 Обмен': '🔄 Trade', 'Обмен с {0}': 'Trade with {0}',
     'Ты отдаёшь': 'You give', 'Друг отдаёт': 'Friend gives', '{0} отдаёт': '{0} gives', 'Готов': 'Ready',

@@ -80,7 +80,7 @@
     <div class="seg" id="modeSeg">
       <button data-mode="online">Онлайн<small>общий сервер</small></button>
       <button data-mode="solo">С ботами<small>оффлайн, только ты</small></button>
-      <button data-mode="lobby">1 на 1<small>лобби с другом</small></button>
+      <button data-mode="lobby">Лобби<small>с друзьями, до 5 на 5</small></button>
     </div>
     <div id="commonOptions">
       <div class="optLabel">Карта</div>
@@ -91,7 +91,7 @@
         <button data-gm="tdm">Командный бой<small>убить всех противников</small></button>
       </div>
     </div>
-    <!-- Лобби 1 на 1: создать, войти по коду, настройки матча -->
+    <!-- Лобби с друзьями (от 1 на 1 до 5 на 5): создать, войти по коду, команды, настройки матча -->
     <div id="lobbyOptions" class="hidden">
       <div id="lobbyNone">
         <button id="lobbyCreateBtn" class="bigGhost">＋ Создать лобби</button>
@@ -104,7 +104,7 @@
           <button id="lobbyCopyBtn" class="ghostBtn small">Копировать</button>
           <button id="lobbyLeaveBtn" class="ghostBtn small">Выйти</button>
         </div>
-        <div class="lobbyVs"><div class="lobbySlot ct" id="lobbySlot0"></div><span>VS</span><div class="lobbySlot t" id="lobbySlot1"></div></div>
+        <div class="lobbyTeams"><div class="lobbyTeam ct" id="lobbyTeamCt"></div><div class="lobbyTeam t" id="lobbyTeamT"></div></div>
         <div id="lobbyInviteBox">
           <div class="optLabel">Позвать друга</div>
           <div class="inviteList" id="lobbyInviteList"></div>

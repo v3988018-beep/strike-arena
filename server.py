@@ -1170,7 +1170,8 @@ async def close_if_empty(g):
 
 
 def start_lobby_game(code, settings, teams):
-    """Лобби 1 на 1: отдельная комната без ботов с правилами из настроек лобби."""
+    """Игра лобби (от 1 на 1 до 5 на 5): отдельная комната с правилами из настроек лобби.
+    Боты — только если хозяин их включил: добивают команды до размера большей."""
     room = f"lobby-{code}"
     old = games.pop(room, None)
     if old:
@@ -1178,7 +1179,8 @@ def start_lobby_game(code, settings, teams):
     g = get_game(room)
     g.lobby = code
     g.lobby_teams = teams
-    g.bot_fill = 0
+    sizes = [sum(1 for t in teams.values() if t == side) for side in ("ct", "t")]
+    g.bot_fill = max(sizes) if settings.get("bots") else 0
     g.mode = settings["mode"]
     g.set_map(settings["map"])
     g.rules.update({k: settings[k] for k in DEFAULT_RULES if k in settings})
@@ -1327,7 +1329,7 @@ async def ws_handler(request):
                 await game.handle_hit(player, data)
 
             elif kind == "team" and game.lobby:
-                await game.send(player, {"type": "chat", "text": "В лобби 1 на 1 команды не меняются"})
+                await game.send(player, {"type": "chat", "text": "В игре лобби команды не меняются — их выбирают в лобби"})
 
             elif kind == "team" and data.get("team") in TEAMS and data["team"] != player.team:
                 player.team = data["team"]

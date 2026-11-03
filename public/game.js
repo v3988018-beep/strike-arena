@@ -1467,8 +1467,13 @@ function updatePlayButton() {
   if (!lobbyState) { play.textContent = 'СОЗДАТЬ ЛОББИ'; play.disabled = !profileMe; }
   else if (lobbyState.inGame) { play.textContent = 'ИДЁТ ИГРА'; play.disabled = true; }
   else if (!host) { play.textContent = 'ЖДЁМ ХОЗЯИНА'; play.disabled = true; }
-  else if (lobbyState.members.length < 2) { play.textContent = 'ЖДЁМ СОПЕРНИКА'; play.disabled = true; }
-  else { play.textContent = 'НАЧАТЬ'; play.disabled = false; }
+  else if (lobbyState.members.length < 2) { play.textContent = 'ЖДЁМ ИГРОКОВ'; play.disabled = true; }
+  else if (!lobbyState.settings.bots && new Set(lobbyState.members.map(m => m.team)).size < 2) {
+    play.textContent = 'НУЖНЫ ОБЕ КОМАНДЫ'; play.disabled = true;   // все в одной команде, а ботов нет
+  } else {
+    const n = t => lobbyState.members.filter(m => m.team === t).length;
+    play.textContent = `НАЧАТЬ ${n('ct')} НА ${n('t')}`; play.disabled = false;
+  }
 }
 
 function renderMenu() {
@@ -1548,7 +1553,7 @@ function handle(m) {
       if (m.map) loadMap(m.map);  // карта этой игры (в онлайне её мог выбрать другой игрок)
       $('winScore2').textContent = m.roundsToWin;
       modeLabel = m.solo ? `Оффлайн · ${DIFF_NAME[m.difficulty]} · ${m.botFill}×${m.botFill}`
-        : m.lobby ? `Лобби 1 на 1 · ${m.lobby}` : '';
+        : m.lobby ? `Лобби · ${m.lobby}` : '';
       rules = { speed: 1, jump: 1, gravity: 1, ...(m.rules || {}) };
       cheatsAllowed = !!m.cheatsAllowed;
       Object.assign(cheat, CHEAT_OFF);  // новая игра — всё выключено
@@ -5180,8 +5185,8 @@ function toast(text, buttons = null, ms = 5000, cls = '') {
 }
 function showInvite(m) {
   const who = `${m.from.name}#${m.from.tag}`;
-  if (inGame) addChat(`✉ ${who} зовёт тебя в лобби 1 на 1 (код ${m.code}) — выйди в меню: K K`);
-  toast(`✉ ${who} зовёт тебя в лобби 1 на 1`, [
+  if (inGame) addChat(`✉ ${who} зовёт тебя в лобби (код ${m.code}) — выйди в меню: K K`);
+  toast(`✉ ${who} зовёт тебя в лобби`, [
     ['Принять', 'yes', () => { if (!inGame) socialSend({ type: 'lobbyJoin', code: m.code }); }],
     ['Нет', 'no'],
   ], 30000, 'invite');
@@ -5342,7 +5347,7 @@ function renderFriends() {
   $('friendsCount').textContent = friends.length ? `· в сети ${friends.filter(f => f.status !== 'offline').length} из ${friends.length}` : '';
   for (const f of [...friends].sort((a, b) => order[a.status] - order[b.status])) {
     const btns = [];
-    if (f.status === 'menu' || f.status === 'lobby') btns.push(['Позвать 1×1', 'ok', () => socialSend({ type: 'lobbyInvite', id: f.id })]);
+    if (f.status === 'menu' || f.status === 'lobby') btns.push(['Позвать в лобби', 'ok', () => socialSend({ type: 'lobbyInvite', id: f.id })]);
     if (f.status !== 'offline') btns.push(['🔄 Обмен', 'ok', () => socialSend({ type: 'tradeInvite', id: f.id })]);
     btns.push(['✕', '', () => { if (confirm(I18N.tr(`Удалить ${f.name} из друзей?`))) socialSend({ type: 'friendRemove', id: f.id }); }]);
     list.append(friendRow(f, btns));
@@ -5425,16 +5430,53 @@ const LOBBY_RULES = [
   ['headshot', 'Только в голову', [[false, 'Нет'], [true, 'Да']]],
   ['money', 'Деньги', [['normal', 'Обычные'], ['unlimited', 'Без лимита']]],
   ['nades', 'Гранаты', [[true, 'Есть'], [false, 'Нет']]],
+  ['bots', 'Боты в пустые места', [[false, 'Нет'], [true, 'Да']]],
 ];
-function lobbySlot(el, member, isHost, team) {
+// Колонка команды: игроки (★ — хозяин, ✕ — хозяин может убрать), пустые места и кнопка «Перейти сюда»
+function lobbyTeamBox(el, team, L, host) {
+  const meId = profileMe?.id;
+  const list = L.members.filter(m => m.team === team);
+  const max = L.teamMax || 5;
   el.textContent = '';
-  el.classList.toggle('empty', !member);
-  if (!member) { el.textContent = 'Ждём соперника…'; return; }
-  const b = document.createElement('b');
-  b.textContent = `${isHost ? '★ ' : ''}${member.name}`;
-  const small = document.createElement('small');
-  small.textContent = `#${member.tag} · ${team}`;
-  el.append(b, small);
+  const head = document.createElement('div');
+  head.className = 'tHead';
+  const title = document.createElement('b');
+  title.textContent = `${team === 'ct' ? 'Спецназ' : 'Террористы'} ${list.length}/${max}`;
+  head.append(title);
+  el.append(head);
+  for (const m of list) {
+    const row = document.createElement('div');
+    row.className = 'lobbySlot' + (m.id === meId ? ' me' : '');
+    const b = document.createElement('b');
+    b.textContent = `${m.id === L.host ? '★ ' : ''}${m.name}`;
+    const small = document.createElement('small');
+    small.textContent = `⭐${m.level ?? 1}`;
+    row.append(b, small);
+    if (host && m.id !== meId && !L.inGame) {
+      const kick = document.createElement('button');
+      kick.className = 'ghostBtn small kick';
+      kick.textContent = '✕';
+      kick.title = 'Убрать из лобби';
+      kick.addEventListener('click', () => { if (confirm(`Убрать ${m.name} из лобби?`)) socialSend({ type: 'lobbyKick', id: m.id }); });
+      row.append(kick);
+    }
+    el.append(row);
+  }
+  for (let i = list.length; i < max; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'lobbySlot empty';
+    empty.textContent = L.settings.bots ? 'бот' : 'свободно';
+    el.append(empty);
+  }
+  // кнопка «перейти в эту команду» — под списком, во всю ширину колонки
+  const mine = L.members.find(m => m.id === meId)?.team;
+  if (mine && mine !== team && list.length < max && !L.inGame) {
+    const go = document.createElement('button');
+    go.className = 'ghostBtn small goTeam';
+    go.textContent = '⇄ Перейти сюда';
+    go.addEventListener('click', () => socialSend({ type: 'lobbyTeam', team }));
+    el.append(go);
+  }
 }
 function renderLobby() {
   $('lobbyNone').classList.toggle('hidden', !!lobbyState);
@@ -5443,20 +5485,21 @@ function renderLobby() {
   const L = lobbyState, s = L.settings;
   const host = profileMe && L.host === profileMe.id;
   $('lobbyCode').textContent = L.code;
-  lobbySlot($('lobbySlot0'), L.members[0], L.members[0]?.id === L.host, 'Спецназ');
-  lobbySlot($('lobbySlot1'), L.members[1], L.members[1]?.id === L.host, 'Террористы');
-  // позвать друга — пока в лобби есть место
-  $('lobbyInviteBox').classList.toggle('hidden', L.members.length >= 2);
+  lobbyTeamBox($('lobbyTeamCt'), 'ct', L, host);
+  lobbyTeamBox($('lobbyTeamT'), 't', L, host);
+  // позвать друзей — пока в лобби есть место
+  $('lobbyInviteBox').classList.toggle('hidden', L.members.length >= (L.max || 10));
   const inv = $('lobbyInviteList');
   inv.textContent = '';
-  const online = friendsData.friends.filter(f => f.status === 'menu' || f.status === 'lobby');
+  const inLobby = new Set(L.members.map(m => m.id));
+  const online = friendsData.friends.filter(f => (f.status === 'menu' || f.status === 'lobby') && !inLobby.has(f.id));
   for (const f of online) {
     const b = document.createElement('button');
     b.textContent = `＋ ${f.name}`;
     b.addEventListener('click', () => socialSend({ type: 'lobbyInvite', id: f.id }));
     inv.append(b);
   }
-  if (!online.length) inv.textContent = 'Нет друзей в сети. Скажи другу код лобби — он введёт его в «1 на 1».';
+  if (!online.length) inv.textContent = 'Нет друзей в сети. Скажи друзьям код лобби — они введут его во вкладке «Лобби».';
 
   $('lobbyHostNote').textContent = host ? '· меняешь ты' : '· меняет хозяин ★';
   const box = $('lobbyRules');

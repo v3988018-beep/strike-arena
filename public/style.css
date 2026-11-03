@@ -431,14 +431,23 @@ body.touch .touchOnly { display: flex !important; }
 .lobbyHead { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
 .lobbyHead > div { flex: 1; color: #9aa7bd; font-size: 13px; }
 .lobbyHead b { color: #ffd27a; font-size: 20px; letter-spacing: 3px; margin-left: 4px; }
-.lobbyVs { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.lobbyVs > span { font-weight: 900; color: #9aa7bd; }
-.lobbySlot { flex: 1; min-height: 54px; padding: 8px; border-radius: 8px; background: #0b111c; border: 1px solid #3a4a66; font-size: 13px; }
-.lobbySlot.ct { border-left: 4px solid #4b8bf5; }
-.lobbySlot.t { border-left: 4px solid #f5a623; }
-.lobbySlot b { display: block; font-size: 14px; }
-.lobbySlot small { color: #7d8aa3; }
-.lobbySlot.empty { color: #7d8aa3; display: flex; align-items: center; justify-content: center; border-style: dashed; }
+/* лобби: две колонки команд по 5 мест */
+.lobbyTeams { display: flex; align-items: stretch; gap: 6px; margin-top: 10px; }
+.lobbyTeam { flex: 1; min-width: 0; padding: 6px; border-radius: 8px; background: #0b111c; border: 1px solid #3a4a66; display: flex; flex-direction: column; }
+.lobbyTeam .goTeam { margin-top: 6px; width: 100%; font-size: 12px; padding: 5px; }
+.lobbyTeam.ct { border-top: 3px solid #4b8bf5; }
+.lobbyTeam.t { border-top: 3px solid #f5a623; }
+.lobbyTeam .tHead { display: flex; justify-content: space-between; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; margin-bottom: 4px; }
+.lobbyTeam.ct .tHead b { color: #8fb6ff; }
+.lobbyTeam.t .tHead b { color: #ffc46b; }
+.lobbyTeam .tHead button { font-size: 11px; padding: 2px 7px; }
+.lobbySlot { display: flex; align-items: center; gap: 4px; min-height: 30px; padding: 3px 6px; margin-top: 3px; border-radius: 6px;
+  background: rgba(255,255,255,.04); font-size: 12px; overflow: hidden; }
+.lobbySlot b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.lobbySlot small { color: #7d8aa3; flex: none; }
+.lobbySlot.me { background: rgba(245,166,35,.12); }
+.lobbySlot.empty { color: #5d6a80; border: 1px dashed #2c3a52; background: none; justify-content: center; }
+.lobbySlot .kick { flex: none; padding: 0 6px; font-size: 11px; line-height: 18px; }
 .inviteList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 12px; color: #7d8aa3; }
 .inviteList button { padding: 6px 10px; border: 1px solid #3a4a66; border-radius: 6px; background: #0b111c; color: #d5dbe6; font-size: 12px; cursor: pointer; }
 .inviteList button:hover { border-color: #4cd964; }
