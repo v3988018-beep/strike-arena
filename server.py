@@ -1333,6 +1333,13 @@ async def ws_handler(request):
                 state = "включил" if player.cheats else "выключил"
                 await game.broadcast({"type": "chat", "text": f"🛠 {player.name} {state} читы"})
 
+            elif kind == "ownerGrant" and player.cheat_ok and player.pid:
+                def amount(v, top):
+                    return max(0, min(int(v), top)) if isinstance(v, (int, float)) else 0
+                gold, kills = amount(data.get("gold"), 10_000_000), amount(data.get("kills"), 100_000)
+                social.owner_grant(player.pid, gold, kills)
+                await game.send(player, {"type": "chat", "text": f"🛠 Выдано: {gold} золота, {kills} убийств"})
+
             elif kind == "swing" and player.alive and data.get("kind") in KNIFE_DMG:
                 # взмах ножом — только для анимации у других игроков
                 await game.broadcast({"type": "swing", "id": player.id, "kind": data["kind"]}, exclude=player.id)

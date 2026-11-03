@@ -378,6 +378,19 @@ class Social:
         self.notify(pid, {"type": "gold", "amount": amount, "reason": reason})
         self.push_wallet(pid)
 
+    def owner_grant(self, pid, gold, kills):
+        """Владелец выдаёт себе золото и убийства (из панели читов; права проверяет server.py)."""
+        if pid not in self.profiles:
+            return
+        if gold:
+            economy.add_gold(self.wallet(pid), gold)
+            self.notify(pid, {"type": "gold", "amount": gold, "reason": "от владельца"})
+            self.push_wallet(pid)
+        if kills:
+            self.record(pid, kills=kills)   # сохранит и обновит меню (ножи открываются по убийствам)
+        else:
+            self.save()
+
     def game_mission(self, pid, *events):
         """Событие для заданий дня ('kill', 'kill:awp', 'head', 'round', ...) — вызывает server.py."""
         if pid not in self.profiles:

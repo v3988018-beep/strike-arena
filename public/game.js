@@ -5894,6 +5894,12 @@ function toggleCheatPanel(open = !cheatPanelOpen) {
 $('cheatSpeed').addEventListener('input', e => { cheat.speed = +e.target.value; applyCheats(); });
 $('cheatAllOff').addEventListener('click', () => { Object.assign(cheat, CHEAT_OFF); applyCheats(); });
 $('cheatClose').addEventListener('click', () => toggleCheatPanel(false));
+// выдать себе золото и убийства — сервер проверит, что это владелец
+$('grantBtn').addEventListener('click', () => {
+  const gold = Math.floor(+$('grantGold').value || 0), kills = Math.floor(+$('grantKills').value || 0);
+  if (gold > 0 || kills > 0) send({ type: 'ownerGrant', gold, kills });
+  $('grantGold').value = $('grantKills').value = '';
+});
 
 // ================== УПРАВЛЕНИЕ НА ТЕЛЕФОНЕ ==================
 // Левая часть экрана — джойстик (появляется там, куда поставил палец), правая — обзор пальцем,
