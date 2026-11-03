@@ -17,7 +17,7 @@ from pathlib import Path
 from aiohttp import web, WSMsgType
 
 from bots import World, BotBrain, BOT_NAMES, DIFFICULTY, DIFFICULTY_NAME, HEAR_DIST
-from grenades import (Nade, DroppedGun, segment_hits_sphere, HE_RADIUS, HE_DAMAGE, FLASH_RANGE,
+from grenades import (Nade, DroppedGun, segment_hits_sphere, HE_RADIUS, he_damage, FLASH_RANGE,
                       SMOKE_RADIUS, SMOKE_TIME)
 import economy
 import social as social_mod
@@ -588,7 +588,7 @@ class Game:
                     continue
                 chest = [p.pos[0], p.pos[1] + 1.0, p.pos[2]]
                 if self.world.los(src, chest):
-                    await self.apply_damage(p, owner, HE_DAMAGE * (1 - d / HE_RADIUS), "he")
+                    await self.apply_damage(p, owner, he_damage(d), "he")
             elif n.kind == "flash":
                 # флешка: ослепляет всех, кто её видит; сильнее всего — если смотрит прямо на неё
                 if d >= FLASH_RANGE or not self.world.los(src, eye) or self.smoke_blocks(src, eye):

@@ -2131,6 +2131,7 @@ function updateRemotes(dt) {
 // ================== ЭФФЕКТЫ ==================
 const effects = [];
 function spawnTracer(from, to) {
+  carveSmokes(from, to);   // пуля прошла сквозь дым — в нём остаётся тоннель
   const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
   const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.9 }));
   scene.add(line);
@@ -2505,23 +2506,49 @@ function updateNades(dt) {
   for (const [id, m] of nadeMeshes) if (!seen.has(id)) { scene.remove(m); freeGeometry(m); nadeMeshes.delete(id); }
 }
 
-// Дымовые облака: шары серого дыма, которые сервер держит 15 секунд
+// Дымовые облака: ~160 небольших клубов (одним InstancedMesh — одна отрисовка на облако), сервер держит дым 15 с.
+// Как в CS2: пуля пробивает в дыме тоннель — клубы вдоль её пути исчезают и через пару секунд снова затягивают дыру
 const smokeClouds = new Map();
-const smokeGeo = new THREE.SphereGeometry(1, 10, 8);
+const smokeGeo = new THREE.SphereGeometry(1, 8, 6);
+const SMOKE_PUFFS = 380;      // мелкие клубы — чтобы дыра от пули была аккуратной, а не пол-облака
+const SMOKE_HOLE = 0.65;      // радиус тоннеля от пули, м (у CS2 меньше — у нас дыру видно лучше)
+const SMOKE_HOLD = 1400;      // сколько дыра держится открытой, мс
+const SMOKE_REFILL = 2200;    // и за сколько затягивается обратно
+const _smokeM = new THREE.Matrix4(), _smokeQ = new THREE.Quaternion(), _smokeS = new THREE.Vector3(), _smokeP = new THREE.Vector3();
 function addSmoke(pos, left) {
   const key = pos.map(v => Math.round(v * 2)).join(',');
   if (smokeClouds.has(key)) return;
   const mat = new THREE.MeshLambertMaterial({ color: 0xb9bdc3, transparent: true, opacity: 0, depthWrite: false });
-  const g = new THREE.Group();
-  for (let i = 0; i < 26; i++) {
-    const s = new THREE.Mesh(smokeGeo, mat);
-    const a = Math.random() * Math.PI * 2, r = Math.random() * 2.6;
-    s.position.set(pos[0] + Math.cos(a) * r, 0.4 + Math.random() * 2.6, pos[2] + Math.sin(a) * r);
-    s.scale.setScalar(1.1 + Math.random() * 0.7);
-    g.add(s);
+  const mesh = new THREE.InstancedMesh(smokeGeo, mat, SMOKE_PUFFS);
+  const puffs = [];
+  for (let i = 0; i < SMOKE_PUFFS; i++) {
+    const a = Math.random() * Math.PI * 2, r = 2.9 * Math.sqrt(Math.random());   // равномерно по кругу
+    const p = { x: pos[0] + Math.cos(a) * r, y: 0.3 + Math.random() * 2.8, z: pos[2] + Math.sin(a) * r,
+      s: 0.38 + Math.random() * 0.3, cut: -Infinity };
+    puffs.push(p);
+    mesh.setMatrixAt(i, _smokeM.compose(_smokeP.set(p.x, p.y, p.z), _smokeQ, _smokeS.setScalar(p.s)));
   }
-  scene.add(g);
-  smokeClouds.set(key, { g, mat, born: performance.now(), until: performance.now() + left * 1000 });
+  mesh.instanceMatrix.needsUpdate = true;
+  scene.add(mesh);
+  smokeClouds.set(key, { mesh, mat, puffs, cx: pos[0], cz: pos[2], cutAt: -Infinity,
+    born: performance.now(), until: performance.now() + left * 1000 });
+}
+// пуля пролетела от a до b — вырезать тоннель во всех облаках, через которые она прошла
+const _seg = new THREE.Line3(), _pt = new THREE.Vector3(), _near = new THREE.Vector3();
+function carveSmokes(a, b) {
+  if (!smokeClouds.size) return;
+  _seg.set(a, b);
+  const now = performance.now();
+  for (const c of smokeClouds.values()) {
+    _seg.closestPointToPoint(_pt.set(c.cx, 1.6, c.cz), true, _near);
+    if (Math.hypot(_near.x - c.cx, _near.z - c.cz) > 4.2) continue;   // пуля прошла мимо облака
+    let hit = false;
+    for (const p of c.puffs) {
+      _seg.closestPointToPoint(_pt.set(p.x, p.y, p.z), true, _near);
+      if (_near.distanceTo(_pt) < SMOKE_HOLE + p.s * 0.75) { p.cut = now; hit = true; }
+    }
+    if (hit) c.cutAt = now;
+  }
 }
 function updateSmokes(now) {
   if (inGame) for (const s of lastSnapshot.smokes || []) addSmoke(s.pos, s.left);
@@ -2529,7 +2556,16 @@ function updateSmokes(now) {
     // плавно густеет за 1 с и тает за последние 2 с
     const appear = Math.min(1, (now - c.born) / 1000), fade = Math.min(1, (c.until - now) / 2000);
     c.mat.opacity = 0.92 * Math.max(0, Math.min(appear, fade));
-    if (now > c.until || !inGame) { scene.remove(c.g); c.mat.dispose(); smokeClouds.delete(key); }
+    // дыры от пуль: пока есть затягивающиеся клубы — обновляем их размер
+    if (now - c.cutAt < SMOKE_HOLD + SMOKE_REFILL + 100) {
+      c.puffs.forEach((p, i) => {
+        const k = Math.max(0, Math.min(1, (now - p.cut - SMOKE_HOLD) / SMOKE_REFILL));
+        const s = p.s * k * k * (3 - 2 * k);   // плавно: сначала медленно, потом быстрее
+        c.mesh.setMatrixAt(i, _smokeM.compose(_smokeP.set(p.x, p.y, p.z), _smokeQ, _smokeS.setScalar(Math.max(s, 1e-4))));
+      });
+      c.mesh.instanceMatrix.needsUpdate = true;
+    }
+    if (now > c.until || !inGame) { scene.remove(c.mesh); c.mat.dispose(); c.mesh.dispose(); smokeClouds.delete(key); }
   }
 }
 
@@ -2546,7 +2582,7 @@ function detonateEffect(kind, pos) {
     new THREE.MeshBasicMaterial({ color: flashy ? 0xffffff : 0xffa040, transparent: true, opacity: 0.95 }));
   ball.position.copy(p);
   scene.add(ball);
-  effects.push({ obj: ball, life: flashy ? 0.18 : 0.45, max: flashy ? 0.18 : 0.45, grow: flashy ? 2 : 5 });
+  effects.push({ obj: ball, life: flashy ? 0.18 : 0.45, max: flashy ? 0.18 : 0.45, grow: flashy ? 2 : 6.4 });   // взрыв HE — по радиусу урона
   const light = new THREE.PointLight(flashy ? 0xffffff : 0xffaa55, flashy ? 40 : 18, 30);
   light.position.copy(p).y += 0.5;
   scene.add(light);
@@ -5526,7 +5562,7 @@ showMenuAgent(settings.agent, 'rifle');
 // Для отладки: http://localhost:8080/?debug — доступ к игроку и стрельбе из консоли
 if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startInspect, viewModels, knifeAttack, switchWeapon, setKnifeModel, playAnim, KNIFE_POSE, tick,
   setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
-  openInspect, closeInspect, renderInspect,
+  openInspect, closeInspect, renderInspect, addSmoke, carveSmokes,
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t) {

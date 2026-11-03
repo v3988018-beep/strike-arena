@@ -11,7 +11,13 @@ FUSE = {"he": 1.6, "flash": 1.4, "smoke": 1.8}        # через скольк�
 BOUNCE = 0.45                                         # сколько скорости остаётся после удара о стену
 FRICTION = 0.75                                       # трение при отскоке от пола
 
-HE_RADIUS, HE_DAMAGE = 7.0, 98
+HE_RADIUS, HE_DAMAGE = 9.0, 125
+HE_FALLOFF = 1.6   # урон = HE_DAMAGE * (1 - (d/R)^HE_FALLOFF): рядом почти полный, к краю радиуса быстро падает
+
+
+def he_damage(d):
+    """Урон осколочной на расстоянии d (без брони)."""
+    return 0.0 if d >= HE_RADIUS else HE_DAMAGE * (1 - (d / HE_RADIUS) ** HE_FALLOFF)
 FLASH_RANGE = 30.0
 SMOKE_RADIUS, SMOKE_TIME = 3.4, 15.0
 
