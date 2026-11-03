@@ -166,6 +166,9 @@ svg.ic.head .hole { fill: #1a1a1a; }
 svg.ic.wb { fill: #7fd4ff; }
 svg.ic.wb .line { stroke: #7fd4ff; stroke-width: 2; stroke-dasharray: 2 2; fill: none; }
 svg.ic.jump { fill: #ffd84d; }
+svg.ic.sm { fill: #c9cfd8; }                  /* через смок */
+svg.ic.bl { fill: #ffffff; }                  /* вслепую */
+svg.ic.bl .hole { fill: #1a1a1a; }
 
 #killNotice { position: absolute; left: 50%; top: 64%; transform: translateX(-50%) scale(.6); opacity: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-shadow: 0 2px 4px #000; }
 #killNotice.show { animation: killPop 1.8s ease-out forwards; }

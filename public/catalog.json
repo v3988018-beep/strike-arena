@@ -926,6 +926,14 @@
    "n": 2,
    "gold": 250,
    "ev": "wallbang"
+  },
+  {
+   "id": "smoke",
+   "icon": "🌫",
+   "text": "{n} убийства через смок",
+   "n": 2,
+   "gold": 250,
+   "ev": "smoke"
   }
  ],
  "rewards": {

@@ -1805,8 +1805,11 @@ const ICONS = {
   // без прицела: круг оптики, перечёркнутый
   noscope: '<svg viewBox="0 0 20 20" class="ic ns"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 5v10M5 10h10" stroke="currentColor" stroke-width="1.2"/><path d="M3 17L17 3" stroke="#ff4d4d" stroke-width="2.4"/></svg>',
   jump: '<svg viewBox="0 0 20 20" class="ic jump"><path d="M10 1l6 7h-4v6H8V8H4z"/><path d="M2 17h16v2H2z"/></svg>',
+  // через дым: облако, перечёркнутое; вслепую: глаз, перечёркнутый
+  smokekill: '<svg viewBox="0 0 24 20" class="ic sm"><path d="M5 16a4 4 0 0 1 0-8a5 5 0 0 1 9-2a4 4 0 0 1 5 3a3.5 3.5 0 0 1 0 7z"/><path d="M3 18L21 2" stroke="#ff4d4d" stroke-width="2.4"/></svg>',
+  blindkill: '<svg viewBox="0 0 24 20" class="ic bl"><path d="M1 10Q12 0 23 10Q12 20 1 10Z"/><circle cx="12" cy="10" r="3.4" class="hole"/><path d="M3 18L21 2" stroke="#ff4d4d" stroke-width="2.4"/></svg>',
 };
-const ICON_TITLE = { head: 'в голову', wallbang: 'прострел', jump: 'в прыжке', noscope: 'без прицела' };
+const ICON_TITLE = { head: 'в голову', wallbang: 'прострел', jump: 'в прыжке', noscope: 'без прицела', smokekill: 'через смок', blindkill: 'вслепую' };
 
 // Силуэты ножей (клинок смотрит вправо)
 const knifeSvg = paths => `<svg viewBox="0 0 60 20" class="gun" fill-rule="evenodd">${paths.map(d => `<path d="${d}"/>`).join('')}</svg>`;
@@ -1824,7 +1827,8 @@ const KNIFE_ICONS = {
 const weaponIcon = m => (m.weapon === 'knife' ? KNIFE_ICONS[m.knife] || KNIFE_ICONS.default : ICONS[m.weapon]) || '';
 
 function onKill(m) {
-  const flags = ['noscope', 'jump', 'wallbang', 'head'].filter(f => m[f]);
+  const flags = ['blind', 'noscope', 'jump', 'smoke', 'wallbang', 'head'].filter(f => m[f])
+    .map(f => f === 'smoke' || f === 'blind' ? f + 'kill' : f);  // ICONS.smoke — уже граната
   const el = document.createElement('div');
   const a = m.assist;  // помощь в убийстве: союзник убийцы, ранивший или ослепивший жертву
   el.className = 'kf' + (m.victimId === me.id || m.killerId === me.id || a?.id === me.id ? ' mine' : '');
@@ -5226,7 +5230,7 @@ $('profCopyBtn').addEventListener('click', () => profileMe && copyText(`${profil
 // --- Ранг 1 на 1 и достижения ---
 const RANK_ICON = { 'Новичок': '🔰', 'Боец': '🥉', 'Ветеран': '🥈', 'Мастер': '🥇', 'Элита': '💎', 'Легенда': '👑' };
 const ACH_ICON = { first_blood: '🩸', kills_100: '💯', kills_1000: '⚙️', head_50: '🎯', knife_10: '🔪', awp_25: '🦅', wall_10: '🧱', noscope_10: '👀',
-  jump_5: '🤸', ace: '🂡', mvp_10: '⭐', plant_10: '💣', defuse_5: '✂️', win_10: '🏆', level_10: '🎖', friend_1: '🤝',
+  jump_5: '🤸', smoke_10: '🌫', blind_3: '😵', ace:'🂡', mvp_10: '⭐', plant_10: '💣', defuse_5: '✂️', win_10: '🏆', level_10: '🎖', friend_1: '🤝',
   duel_1: '⚔️', duel_legend: '👑' };
 function renderRankAndAch() {
   if (!profileMe) return;
@@ -5605,7 +5609,7 @@ showMenuAgent(settings.agent, 'rifle');
 // Для отладки: http://localhost:8080/?debug — доступ к игроку и стрельбе из консоли
 if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startInspect, viewModels, knifeAttack, switchWeapon, setKnifeModel, playAnim, KNIFE_POSE, tick,
   setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
-  openInspect, closeInspect, renderInspect, addSmoke, carveSmokes,
+  openInspect, closeInspect, renderInspect, addSmoke, carveSmokes, onKill,
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t) {

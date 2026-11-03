@@ -159,6 +159,7 @@ class Player:
         self.assists = 0         # помощь в убийствах
         self.dmg_from = {}       # кто сколько урона нанёс мне в этой жизни (для помощи)
         self.flashed_by = None   # кто ослепил и до какого времени: (id, до)
+        self.blind_until = 0.0   # до какого времени ослеплён (для убийства вслепую)
         self.crouch = False
         self.respawn_at = 0.0
         # зажата E (закладка / разминирование): с какого момента и откуда
@@ -309,6 +310,7 @@ class Game:
         p.crouch = False
         p.dmg_from = {}
         p.flashed_by = None
+        p.blind_until = 0.0
 
     def kill_off(self, p: Player):
         """Игрок выбывает до следующего раунда (или на RESPAWN_TIME в разминке)."""
@@ -368,11 +370,19 @@ class Game:
             pen = data.get("pen")
             mult = float(pen) if isinstance(pen, (int, float)) else WALLBANG_MUL
             dmg = max(1, round(dmg * min(max(mult, 0.25), 1.0)))
+        # сквозь дым: линия от глаз стрелка до места попадания проходит через облако
+        smoke = False
+        if weapon != "knife" and self.smokes:
+            eye = [shooter.pos[0], shooter.pos[1] + (1.15 if shooter.crouch else 1.6), shooter.pos[2]]
+            spot = [target.pos[0], target.pos[1] + (1.5 if is_head else 1.0), target.pos[2]]
+            smoke = self.smoke_blocks(eye, spot)
         await self.apply_damage(target, shooter, dmg, weapon, is_head,
                                 wallbang=wallbang, jump=bool(data.get("jump")),
-                                noscope=bool(data.get("noscope")) and weapon == "awp")
+                                noscope=bool(data.get("noscope")) and weapon == "awp",
+                                smoke=smoke, blind=time.time() < shooter.blind_until)
 
-    async def apply_damage(self, target, attacker, dmg, weapon, head=False, wallbang=False, jump=False, noscope=False):
+    async def apply_damage(self, target, attacker, dmg, weapon, head=False, wallbang=False, jump=False, noscope=False,
+                           smoke=False, blind=False):
         """Урон с учётом брони; при убийстве — килфид и награда убийце."""
         if head and target.armor >= 2:
             dmg *= ARMOR_HEAD.get(weapon, 1.0)
@@ -401,12 +411,12 @@ class Game:
                 ace = int(enemy >= 3 and attacker.round_kills == enemy)   # один убил всю команду врага за раунд
                 social.record(attacker.pid, kills=1, headshots=int(head), knife_kills=int(weapon == "knife"),
                               awp_kills=int(weapon == "awp"), wallbangs=int(wallbang), jump_kills=int(jump), aces=ace,
-                              noscopes=int(noscope))
+                              noscopes=int(noscope), smoke_kills=int(smoke), blind_kills=int(blind))
                 self.award(attacker, 25 if head else 20, "хедшот" if head else "убийство")
                 if attacker.pid and not attacker.brain:   # золото и задания дня — считает сервер
                     social.game_gold(attacker.pid, GOLD["kill"], "убийство")
                     social.game_mission(attacker.pid, "kill", f"kill:{weapon}", head and "head",
-                                        jump and "jump", wallbang and "wallbang")
+                                        jump and "jump", wallbang and "wallbang", smoke and "smoke")
                 helper = assist and self.players.get(assist["id"])
                 if helper:
                     self.award(helper, 10, "помощь")
@@ -418,7 +428,7 @@ class Game:
                 "killerTeam": attacker.team, "victim": target.name,
                 "victimTeam": target.team, "victimId": target.id,
                 "head": head, "wallbang": wallbang, "jump": jump, "noscope": noscope,
-                "weapon": weapon, "knife": attacker.knife, "respawn": self.phase == "warmup",
+                "smoke": smoke, "blind": blind, "weapon": weapon, "knife": attacker.knife, "respawn": self.phase == "warmup",
                 "assist": assist, "cheats": attacker.cheats,
             })
 
@@ -599,6 +609,8 @@ class Game:
                 duration = (3.5 if dot > 0.5 else 1.6 if dot > -0.3 else 0.5) * max(0.3, 1 - d / FLASH_RANGE)
                 if owner and p.team != owner.team and duration > 0.6:
                     p.flashed_by = (owner.id, now + duration + 1.0)  # для «помощи флешкой»
+                if duration > 0.6:
+                    p.blind_until = max(p.blind_until, now + duration * 0.8)  # почти ничего не видит
                 if p.brain:
                     p.brain.blind_until = now + duration
                 else:
