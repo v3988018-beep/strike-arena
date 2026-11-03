@@ -3210,6 +3210,16 @@ function flick(p, t, k, speed = 38) {
     ring: k * (0.5 + 0.4 * Math.sin(t * speed - 2.4)), pinky: k * 0.6, thumb: k * (0.5 + 0.5 * Math.sin(t * speed + 1.6)),
   });
 }
+// Взмах бабочки на отрезке [a, b]: клинок из положения from в to, свободная половинка отходит и возвращается,
+// пальцы плавно приоткрываются (указательный держит), в конце кулак сжимается — поймал рукоять
+function butterflyFlip(p, t, a, b, from, to) {
+  const u = ease(seg(t, a, b));
+  setBlade(p, from + (to - from) * u);
+  p.halfB.rotation.x = -2.4 * Math.sin(Math.PI * u);
+  const loose = bump(t, a - 0.04, b), grip = bump(t, b - 0.04, b + 0.08);
+  fingers(p, { index: 0.15 * loose - 0.15 * grip, middle: 0.5 * loose - 0.2 * grip, ring: 0.6 * loose - 0.2 * grip,
+    pinky: 0.7 * loose - 0.2 * grip, thumb: 0.45 * loose - 0.15 * grip });
+}
 // Удар: кулак сжимается
 const squeeze = (p, k) => fingers(p, { ...all4(-0.25 * k), thumb: -0.2 * k });
 
@@ -3283,23 +3293,20 @@ const KNIFE_ANIMS = {
     } },
   },
   butterfly: {
-    // раскрытие: пальцы перебирают, отпуская и ловя половинки, вторая половинка делает полный оборот
-    draw: { time: 1.1, fn: (t, p) => {
-      const u = ease(seg(t, 0.2, 0.9));
-      setBlade(p, u);
-      p.halfB.rotation.x = -TAU * u;
-      flick(p, t, bump(t, 0.15, 0.95));
-      return add(raise(seg(t, 0, 0.35)), { rz: 0.15 * bump(t, 0.2, 0.9) });
+    // раскрытие одним взмахом кисти: свободная половинка отходит и возвращается, клинок выходит,
+    // пальцы чуть отпускают рукоять и плотно ловят её в конце
+    draw: { time: 0.85, fn: (t, p) => {
+      butterflyFlip(p, t, 0.25, 0.7, 0, 1);
+      return add(raise(seg(t, 0, 0.35)), { rz: 0.3 * bump(t, 0.25, 0.75), ry: -0.12 * bump(t, 0.25, 0.75) });
     } },
-    // разглядывает клинок, посередине пальцами складывает и снова раскрывает
-    inspect: { time: 3.2, fn: (t, p) => {
-      const close = ease(seg(t, 0.4, 0.5)), open = ease(seg(t, 0.52, 0.64));
-      setBlade(p, 1 - close + open);
-      p.halfB.rotation.x = TAU * close - TAU * open;
-      const pose = bladeView(t, p);
-      const k = bump(t, 0.37, 0.67);
-      if (k > 0) flick(p, t * 3.2, k, 24);  // в секундах — чтобы скорость пальцев не зависела от длины анимации
-      return pose;
+    // разглядывает клинок, потом складывает и снова раскрывает двумя взмахами
+    inspect: { time: 3.4, fn: (t, p) => {
+      const look = t < 0.55 ? bladeView(t / 0.55, p) : {};
+      if (t >= 0.54 && t < 0.74) butterflyFlip(p, t, 0.58, 0.72, 1, 0);
+      else if (t >= 0.74) butterflyFlip(p, t, 0.76, 0.9, 0, 1);
+      const k = bump(t, 0.56, 0.95);
+      return add(look, { px: -0.04 * k, py: 0.03 * k,
+        rz: 0.3 * (bump(t, 0.58, 0.72) - bump(t, 0.76, 0.9)) });
     } },
     slash: { time: 0.28, fn: (t, p) => { squeeze(p, Math.sin(Math.PI * t)); return slashPose(t, 1.1); } },
     // два быстрых тычка
