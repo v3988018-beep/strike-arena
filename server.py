@@ -151,6 +151,8 @@ class Player:
         self.weapon = "pistol"
         self.knife = "default"   # какой нож выбран в меню
         self.skins = {}          # надетые скины: {оружие: id скина} — чтобы другие видели
+        self.cheat_knife = False # нож выдан из панели читов или подобран с земли — его можно выбросить
+        self.own_knife = ("default", None)  # свой нож из меню (тип, скин) — возвращается, когда выбросил чужой
         # снаряжение: деньги, основное оружие, пистолет, броня (0 — нет, 1 — жилет, 2 — жилет+шлем), гранаты
         self.money = START_MONEY
         self.reset_loadout()
@@ -500,7 +502,8 @@ class Game:
         """G: выбросить оружие из рук. Клиент присылает откуда и с какой скоростью оно полетит."""
         item = p.weapon
         pos, vel = data.get("pos"), data.get("vel")
-        if not p.alive or item not in GUNS or not p.owns(item):
+        knife = item == "knife" and p.cheat_knife   # нож выбрасывается, только если он выдан читом или подобран
+        if not p.alive or not (knife or (item in GUNS and p.owns(item))):
             return
         if not (isinstance(pos, list) and isinstance(vel, list) and len(pos) == 3 and len(vel) == 3):
             return
@@ -509,6 +512,11 @@ class Game:
         except (TypeError, ValueError):
             return
         if dist2d(pos, p.pos) > 2.0 or sum(v * v for v in vel) > 15 ** 2:
+            return
+        if knife:
+            self.drop_knife(p, pos, vel)
+            await self.send_knife(p)
+            await self.broadcast({"type": "gunDrop", "id": p.id, "pos": pos})
             return
         ammo = data.get("ammo") if isinstance(data.get("ammo"), dict) else None
         if self.drop_gun(p, item, pos, vel, ammo):
@@ -519,6 +527,16 @@ class Game:
         """E: взять конкретный ствол с земли; если слот занят — своё оружие падает на его место (обмен)."""
         gun = next((g for g in self.guns if g.id == data.get("id")), None)
         if not gun or not p.alive or dist2d(gun.pos, p.pos) > 2.2 or abs(gun.pos[1] - p.pos[1]) > 2.0:
+            return
+        if gun.item == "knife":
+            # чужой нож: свой выданный/подобранный падает на его место, обычный свой — просто убирается
+            self.guns.remove(gun)
+            if p.cheat_knife:
+                a = p.yaw
+                self.drop_knife(p, [p.pos[0], p.pos[1] + 0.8, p.pos[2]], [-math.sin(a) * 1.5, 1.0, -math.cos(a) * 1.5])
+            self.set_knife(p, gun.knife, gun.skin)
+            await self.send_knife(p)
+            await self.broadcast({"type": "gunDrop", "id": p.id, "pos": p.pos})
             return
         slot = slot_of(gun.item)
         old = getattr(p, slot)
@@ -535,6 +553,75 @@ class Game:
         p.weapon = gun.item
         await self.send(p, {"type": "inventory", **p.inventory(), "picked": gun.item, "ammo": gun.ammo, "skin": gun.skin})
         await self.broadcast({"type": "gunDrop", "id": p.id, "pos": p.pos})
+
+    def set_knife(self, p, knife, skin):
+        """Взять в руки чужой нож (выдан читом или подобран): его можно выбросить на G."""
+        p.knife = knife
+        if skin:
+            p.skins["knife"] = skin
+        else:
+            p.skins.pop("knife", None)
+        p.cheat_knife = True
+        p.weapon = "knife"
+
+    def drop_knife(self, p, pos, vel):
+        """Выбросить выданный/подобранный нож; в руках снова свой нож из меню."""
+        gun = DroppedGun("knife", p.id, pos, vel, p.yaw, time.time(), None, p.skins.get("knife"))
+        gun.knife = p.knife
+        if gun.inside(self.world):
+            gun.pos = [p.pos[0], p.pos[1] + 1.0, p.pos[2]]
+        self.guns.append(gun)
+        if len(self.guns) > self.MAX_GUNS:
+            self.guns.pop(0)
+        p.knife, own_skin = p.own_knife
+        if own_skin:
+            p.skins["knife"] = own_skin
+        else:
+            p.skins.pop("knife", None)
+        p.cheat_knife = False
+        if p.weapon == "knife":
+            p.weapon = p.primary or p.secondary or "knife"
+
+    async def send_knife(self, p):
+        await self.send(p, {"type": "knife", "knife": p.knife, "skin": p.skins.get("knife"),
+                            "cheat": p.cheat_knife, "weapon": p.weapon})
+
+    async def owner_give(self, p, data):
+        """Панель читов владельца: выдать себе в катке оружие (со скином), нож, гранату или броню."""
+        item, skin = data.get("item"), data.get("skin")
+        s = economy.SKIN_BY_ID.get(skin) if isinstance(skin, str) else None
+        if not p.alive:
+            return
+        if item == "knife":
+            knife = data.get("knife")
+            if knife not in KNIVES:
+                return
+            ok = s and s["weapon"] == "knife" and s.get("knife") == knife
+            if p.cheat_knife:   # прежний выданный нож — под ноги
+                a = p.yaw
+                self.drop_knife(p, [p.pos[0], p.pos[1] + 0.8, p.pos[2]], [-math.sin(a) * 1.5, 1.0, -math.cos(a) * 1.5])
+            self.set_knife(p, knife, skin if ok else None)
+            await self.send_knife(p)
+        elif item in GUNS:
+            slot = slot_of(item)
+            old = getattr(p, slot)
+            if old and old != item:   # прежний ствол из этого слота — под ноги
+                a = p.yaw
+                self.guns.append(DroppedGun(old, None, [p.pos[0], p.pos[1] + 0.8, p.pos[2]],
+                                            [-math.sin(a) * 1.5, 1.0, -math.cos(a) * 1.5], p.yaw, time.time(),
+                                            None, p.skins.get(old)))
+            setattr(p, slot, item)
+            p.weapon = item
+            if s and s["weapon"] == item:
+                p.skins[item] = skin
+            await self.send(p, {"type": "inventory", **p.inventory(), "picked": item, "given": True,
+                                "skin": p.skins.get(item)})
+        elif item in NADES:
+            p.nades[item] = min(p.nades.get(item, 0) + 1, 5)
+            await self.send(p, {"type": "inventory", **p.inventory(), "bought": item})
+        elif item in ("kevlar", "helmet"):
+            p.armor = 2 if item == "helmet" else max(p.armor, 1)
+            await self.send(p, {"type": "inventory", **p.inventory(), "bought": item})
 
     def drop_on_death(self, p):
         """Убитый роняет лучшее оружие — его можно подобрать."""
@@ -555,8 +642,8 @@ class Game:
             for g in list(self.guns):
                 if g.owner == p.id and now - g.born < 1.0:
                     continue
-                if dist2d(g.pos, p.pos) > self.PICKUP_DIST or abs(g.pos[1] - p.pos[1]) > 1.8:
-                    continue
+                if g.item == "knife" or dist2d(g.pos, p.pos) > self.PICKUP_DIST or abs(g.pos[1] - p.pos[1]) > 1.8:
+                    continue   # нож подбирают только на E
                 slot = slot_of(g.item)
                 if getattr(p, slot):
                     continue
@@ -1264,6 +1351,7 @@ async def ws_handler(request):
                     player.skins = {k: v for k, v in skins.items()
                                     if k in (*GUNS, "knife", "agent_ct", "agent_t")
                                     and isinstance(v, str) and v in owned}
+                player.own_knife = (player.knife, player.skins.get("knife"))
                 game.next_id += 1
                 game.spawn(player)
                 # в середине раунда новичок ждёт следующего
@@ -1332,6 +1420,15 @@ async def ws_handler(request):
                 player.cheats = bool(data.get("on"))
                 state = "включил" if player.cheats else "выключил"
                 await game.broadcast({"type": "chat", "text": f"🛠 {player.name} {state} читы"})
+
+            elif kind == "ownerGive" and player.cheat_ok:
+                await game.owner_give(player, data)
+
+            elif kind == "ownerGiveSkin" and player.cheat_ok and player.pid:
+                skin = data.get("skin")
+                if social.owner_give_skin(player.pid, skin):
+                    s = economy.SKIN_BY_ID[skin]
+                    await game.send(player, {"type": "chat", "text": f"🛠 В инвентарь: {s['name']}"})
 
             elif kind == "ownerGrant" and player.cheat_ok and player.pid:
                 def amount(v, top):

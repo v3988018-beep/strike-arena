@@ -83,12 +83,13 @@ class DroppedGun(Nade):
         self.yaw = yaw                     # куда смотрит ствол, когда лежит
         self.ammo = ammo                   # патроны в магазине и запасе — переходят к тому, кто подобрал
         self.skin = skin
+        self.knife = None                  # у выброшенного ножа (item == "knife") — его тип: karambit, m9, ...
         self.born = now
         self.rest = False                  # упало и лежит — физику больше не считаем
 
     def public(self):
         return {"id": self.id, "item": self.item, "pos": [round(v, 2) for v in self.pos],
-                "yaw": round(self.yaw, 2), "rest": self.rest, "skin": self.skin}
+                "yaw": round(self.yaw, 2), "rest": self.rest, "skin": self.skin, "knife": self.knife}
 
     def step(self, world, dt):
         if self.rest:

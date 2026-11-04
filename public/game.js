@@ -1056,10 +1056,11 @@ function saveProfile() {
 // Какие скины надеты у меня — те же объекты, что в профиле
 let mySkins = wallet.equipped;
 
-function setKnifeModel(type) {
+// skin — для чужого ножа (выдан читом или подобран); иначе свой надетый скин
+function setKnifeModel(type, skin) {
   if (viewModels.knife) { hands.remove(viewModels.knife); freeGeometry(viewModels.knife); }
   viewModels.knife = buildKnifeViewModel(type);
-  applySkin(viewModels.knife, type, mySkins.knife);
+  applySkin(viewModels.knife, type, skin === undefined ? mySkins.knife : skin);
   hands.add(viewModels.knife);
 }
 setKnifeModel('default');
@@ -1078,8 +1079,23 @@ function refreshMyWeapons() {
     hands.add(vm);
     viewModels[w] = vm;
   }
-  setKnifeModel(viewModels.knife.userData.knifeType);
+  setKnifeModel(viewModels.knife.userData.knifeType, cheatKnife ? cheatKnife.skin : undefined);
 }
+// Оружие в руках с конкретным скином (выдано из панели читов)
+function setGunSkin(w, skin) {
+  const old = viewModels[w];
+  const vm = buildViewModel(w);
+  applySkin(vm, w, skin);
+  vm.position.copy(VM_HIP);
+  vm.scale.setScalar(0.7);
+  vm.visible = old.visible;
+  hands.remove(old);
+  freeGeometry(old);
+  hands.add(vm);
+  viewModels[w] = vm;
+}
+// Нож не из меню (выдан читом или подобран с земли): { knife, skin } — его можно выбросить на G
+let cheatKnife = null;
 
 // ================== ПЕРСОНАЖ В ГЛАВНОМ МЕНЮ ==================
 // Стоит у базы террористов, камера смотрит на него, а за ним — вид через всю карту к центру.
@@ -1593,6 +1609,8 @@ function handle(m) {
       $('cheatBadge').classList.add('hidden');
       if (cheatsAllowed) addChat('🛠 F6 — панель читов (все увидят метку 🛠 у твоего ника)');
       myKnife = KNIVES[settings.knife] ? settings.knife : 'default';
+      cheatKnife = null;
+      refreshMyWeapons();   // выданные в прошлой игре скины — убрать, в руках снова свои
       setKnifeModel(myKnife);
       me.weapon = 'pistol';
       setTeam(m.team);
@@ -1620,6 +1638,7 @@ function handle(m) {
       Object.assign(inv, { money: m.money, primary: m.primary, secondary: m.secondary, armor: m.armor, nades: m.nades, sellable: m.sellable || [] });
       if (m.sold) playTone(520, 0.06, 0.08, 'sine');
       if (m.delta) showMoneyDelta(m.delta, m.reason);
+      if (m.given && WEAPONS[m.picked]) setGunSkin(m.picked, m.skin || null);  // выдано из панели читов
       if (m.picked && WEAPONS[m.picked]) {
         // подобрал с земли — с теми патронами, что в нём остались
         const full = WEAPONS[m.picked], a = m.ammo;
@@ -1641,6 +1660,15 @@ function handle(m) {
         setTimeout(() => { if (!owns(me.weapon)) switchWeapon(bestWeapon()); }, isNade(me.weapon) ? 350 : 0);
       }
       renderBuyMenu();
+      break;
+    }
+    case 'knife': {  // нож в руках сменился: выдан читом, подобран чужой или выброшен (тогда снова свой)
+      cheatKnife = m.cheat ? { knife: m.knife, skin: m.skin || null } : null;
+      myKnife = KNIVES[m.knife] ? m.knife : 'default';
+      setKnifeModel(myKnife, cheatKnife ? cheatKnife.skin : undefined);
+      playTone(620, 0.06, 0.08, 'sine');
+      if (m.weapon === 'knife') { me.weapon = 'knife'; drawWeapon(); }
+      else if (me.weapon === 'knife') { me.weapon = ''; switchWeapon(m.weapon); }
       break;
     }
     case 'gunDrop':  // кто-то выбросил оружие — глухой стук
@@ -2450,9 +2478,16 @@ function updateGroundGuns(dt) {
     if (!m) {
       m = new THREE.Group();
       const inner = new THREE.Group();
-      GUN_BUILDERS[g.item]?.(inner);
-      applySkin(inner, g.item, g.skin);
-      inner.scale.setScalar(0.66);  // как в руках у персонажей
+      if (g.item === 'knife') {   // выброшенный нож (выдан читом)
+        const type = KNIVES[g.knife] ? g.knife : 'default';
+        buildKnife(type, inner);
+        applySkin(inner, type, g.skin);
+        inner.scale.setScalar(1.4);
+      } else {
+        GUN_BUILDERS[g.item]?.(inner);
+        applySkin(inner, g.item, g.skin);
+        inner.scale.setScalar(0.66);  // как в руках у персонажей
+      }
       inner.traverse(o => { o.castShadow = true; });
       m.add(inner);
       m.position.set(...g.pos);
@@ -2491,6 +2526,7 @@ function gunToPick() {
 }
 const slotWeapon = item => (PRIMARY.includes(item) ? inv.primary : inv.secondary);
 function pickUpGun(g) {
+  if (g.item === 'knife') { send({ type: 'pickup', id: g.id }); return; }
   const old = slotWeapon(g.item);
   me.reloadEnd = 0;
   ui.reloadBar.style.visibility = 'hidden';
@@ -2501,8 +2537,9 @@ function updatePickHint() {
   const g = !bombActionHere() && gunToPick();
   const el = $('pickHint');
   if (!g) { el.classList.add('hidden'); return; }
-  const old = slotWeapon(g.item);
-  el.textContent = old && old !== g.item
+  const old = g.item === 'knife' ? null : slotWeapon(g.item);
+  el.textContent = g.item === 'knife' ? `E — подобрать ${KNIVES[g.knife] || KNIVES.default}`
+    : old && old !== g.item
     ? `E — поменять ${WEAPONS[old].name} на ${WEAPONS[g.item].name}`
     : `E — подобрать ${WEAPONS[g.item].name}`;
   el.classList.remove('hidden');
@@ -2516,7 +2553,8 @@ function bombActionHere() {
 // G — выбросить оружие из рук вперёд (летит по дуге, его может подобрать любой, у кого этот слот пуст)
 function dropWeapon() {
   const w = me.weapon;
-  if (!me.alive || chatOpen || !WEAPONS[w] || !owns(w)) return;
+  const knife = w === 'knife' && cheatKnife;   // нож выбрасывается, только если он не свой (выдан читом или подобран)
+  if (!me.alive || chatOpen || !(knife || (WEAPONS[w] && owns(w)))) return;
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   const pos = camera.position.clone().addScaledVector(fwd, 0.4).add(new THREE.Vector3(0, -0.25, 0));
   const vel = fwd.multiplyScalar(5).add(new THREE.Vector3(me.vel.x, 1.6, me.vel.z));
@@ -5951,6 +5989,41 @@ function toggleCheatPanel(open = !cheatPanelOpen) {
 $('cheatSpeed').addEventListener('input', e => { cheat.speed = +e.target.value; applyCheats(); });
 $('cheatAllOff').addEventListener('click', () => { Object.assign(cheat, CHEAT_OFF); applyCheats(); });
 $('cheatClose').addEventListener('click', () => toggleCheatPanel(false));
+// выдать себе предмет: в руки в катке (оружие со скином, любой нож, граната, броня) или скин в инвентарь.
+// Значение пункта: 'rifle', 'knife:karambit', 'he', 'helmet'
+(function setupGive() {
+  const items = $('giveItem'), skins = $('giveSkin');
+  const opt = (sel, value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.append(o); };
+  const group = (label, list) => {
+    const g = document.createElement('optgroup'); g.label = label;
+    for (const [v, t] of list) opt(g, v, t);
+    items.append(g);
+  };
+  group('Оружие', GUN_LIST.map(w => [w, WEAPONS[w].name]));
+  group('Ножи', KNIFE_ORDER.map(k => [`knife:${k}`, KNIVES[k]]));
+  group('Гранаты', NADE_KINDS.map(n => [n, NADE_NAME[n]]));
+  group('Броня', [['helmet', 'Броня + шлем']]);
+  group('Агенты (только в инвентарь)', [['agent_ct', 'Агент спецназа'], ['agent_t', 'Агент террористов']]);
+  const fillSkins = () => {
+    const [w, knife] = items.value.split(':');
+    skins.textContent = '';
+    const list = SKINS.filter(s => (knife ? s.weapon === 'knife' && s.knife === knife : s.weapon === w));
+    opt(skins, '', list.length ? 'без скина' : '—');
+    for (const s of list) opt(skins, s.id, s.name);
+    skins.disabled = !list.length;
+    $('giveHands').disabled = w.startsWith('agent');
+  };
+  items.addEventListener('change', fillSkins);
+  fillSkins();
+  $('giveHands').addEventListener('click', () => {
+    const [w, knife] = items.value.split(':');
+    send({ type: 'ownerGive', item: w, knife, skin: skins.value || null });
+  });
+  $('giveInv').addEventListener('click', () => {
+    if (!skins.value) { addChat('🛠 Выбери скин, чтобы положить его в инвентарь'); return; }
+    send({ type: 'ownerGiveSkin', skin: skins.value });
+  });
+})();
 // выдать себе золото и убийства — сервер проверит, что это владелец
 $('grantBtn').addEventListener('click', () => {
   const gold = Math.floor(+$('grantGold').value || 0), kills = Math.floor(+$('grantKills').value || 0);

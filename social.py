@@ -391,6 +391,15 @@ class Social:
         else:
             self.save()
 
+    def owner_give_skin(self, pid, skin):
+        """Владелец кладёт себе в инвентарь любой скин (из панели читов; права проверяет server.py)."""
+        if pid not in self.profiles or not isinstance(skin, str) or skin not in economy.SKIN_BY_ID:
+            return False
+        economy.give_skin(self.wallet(pid), skin)
+        self.save()
+        self.push_wallet(pid)
+        return True
+
     def game_mission(self, pid, *events):
         """Событие для заданий дня ('kill', 'kill:awp', 'head', 'round', ...) — вызывает server.py."""
         if pid not in self.profiles:

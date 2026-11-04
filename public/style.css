@@ -587,6 +587,9 @@ body.touch .touchOnly { display: flex !important; }
 .cheatGrant { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; flex-wrap: wrap; }
 .cheatGrant input { width: 110px; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; }
 .cheatGrant button { padding: 6px 14px; }
+.cheatGive { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; flex-wrap: wrap; }
+.cheatGive select { padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; max-width: 220px; }
+.cheatGive button { padding: 6px 12px; }
 .cheatSpeedRow output { width: 40px; text-align: right; font-weight: 800; color: #ff6b6b; }
 .cheatBtns { display: flex; gap: 8px; margin-top: 12px; }
 .cheatBtns button { flex: 1; padding: 9px; border: 0; border-radius: 8px; font-weight: 800; cursor: pointer; }
