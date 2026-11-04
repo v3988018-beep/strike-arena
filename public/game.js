@@ -5663,6 +5663,14 @@ if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startI
   setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
   openInspect, closeInspect, renderInspect, addSmoke, carveSmokes, onKill,
   useKnife(t) { myKnife = t; setKnifeModel(t); },  // взять в руки нож другого типа
+  // пройдёт ли пуля оружия weapon от a до b (для проверки аима сквозь ящики)
+  canShoot(a, b, weapon) {
+    const A = new THREE.Vector3(...a), d = new THREE.Vector3(...b).sub(A);
+    raycaster.set(A, d.clone().normalize());
+    raycaster.far = d.length();
+    return bulletPasses(WEAPONS[weapon]);
+  },
+  solids: () => solidMeshes.map(m => ({ pen: !!m.userData.penetrable, box: m.userData.box && [m.userData.box.min.toArray(), m.userData.box.max.toArray()] })),
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t, bare) {
@@ -6214,25 +6222,43 @@ function drawESP() {
     espCtx.strokeText(label, x, y1 - 5); espCtx.fillText(label, x, y1 - 5);
   }
 }
+// Пройдёт ли пуля из оружия w по лучу (raycaster уже направлен и ограничен) — те же правила прострела, что в fireBullet:
+// ящики насквозь, стены — только тонкие места, не больше двух препятствий
+function bulletPasses(w) {
+  let pens = 0;
+  for (const hit of raycaster.intersectObjects(solidMeshes, false)) {
+    const ud = hit.object.userData;
+    const exit = ud.box ? rayExit(raycaster.ray, ud.box) : null;
+    const thickness = exit === null ? Infinity : exit - hit.distance;
+    if (pens >= 2 || !(ud.penetrable ? thickness < 3 : thickness <= w.pen)) return false;
+    pens++;
+  }
+  return true;
+}
 // Аим: пока зажата стрельба — прицел сам встаёт на голову ближайшего к перекрестию врага, которого видно
-// (в любую сторону, даже за спиной); вместе с нулевым разбросом и без отдачи — каждая пуля в голову
+// (в любую сторону, даже за спиной); вместе с нулевым разбросом и без отдачи — каждая пуля в голову.
+// Если видимых нет — наводится и на врага за препятствием, которое это оружие простреливает (ящик, тонкая кромка)
 function aimbot() {
   if (me.weapon === 'knife' || isNade(me.weapon)) return;
+  const w = WEAPONS[me.weapon];
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  let best = null, bestDot = -2;
+  let best = null, bestDot = -2, behind = null, behindDot = -2;
   for (const r of remotes.values()) {
     if (!r.data.alive || r.team === me.team) continue;
     const head = enemyHead(r);
     const to = head.clone().sub(camera.position);
     const dist = to.length();
     const dot = to.normalize().dot(fwd);
-    if (dot < bestDot) continue;
+    if (dot < bestDot && dot < behindDot) continue;
     raycaster.set(camera.position, to);
     raycaster.far = dist - 0.3;
-    // за стеной — не наводимся (если только пули и так не летят сквозь стены)
-    if (!cheat.wallshot && raycaster.intersectObjects(solidMeshes, false).length) continue;
-    best = head; bestDot = dot;
+    if (cheat.wallshot || !raycaster.intersectObjects(solidMeshes, false).length) {
+      if (dot > bestDot) { best = head; bestDot = dot; }
+    } else if (w && dist <= w.range && dot > behindDot && bulletPasses(w)) {
+      behind = head; behindDot = dot;   // за простреливаемым препятствием
+    }
   }
+  best = best || behind;
   if (!best) return;
   const d = best.sub(camera.position);
   me.yaw = Math.atan2(-d.x, -d.z);
