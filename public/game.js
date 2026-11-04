@@ -2547,11 +2547,11 @@ function updateNades(dt) {
   for (const [id, m] of nadeMeshes) if (!seen.has(id)) { scene.remove(m); freeGeometry(m); nadeMeshes.delete(id); }
 }
 
-// Дымовые облака: ~160 небольших клубов (одним InstancedMesh — одна отрисовка на облако), сервер держит дым 15 с.
+// Дымовые облака: ~260 небольших клубов (одним InstancedMesh — одна отрисовка на облако), сервер держит дым 15 с.
 // Как в CS2: пуля пробивает в дыме тоннель — клубы вдоль её пути исчезают и через пару секунд снова затягивают дыру
 const smokeClouds = new Map();
 const smokeGeo = new THREE.SphereGeometry(1, 8, 6);
-const SMOKE_PUFFS = 380;      // мелкие клубы — чтобы дыра от пули была аккуратной, а не пол-облака
+const SMOKE_PUFFS = 260;      // мелкие клубы — чтобы дыра от пули была аккуратной, а не пол-облака
 const SMOKE_HOLE = 0.65;      // радиус тоннеля от пули, м (у CS2 меньше — у нас дыру видно лучше)
 const SMOKE_HOLD = 1400;      // сколько дыра держится открытой, мс
 const SMOKE_REFILL = 2200;    // и за сколько затягивается обратно
@@ -2559,13 +2559,15 @@ const _smokeM = new THREE.Matrix4(), _smokeQ = new THREE.Quaternion(), _smokeS =
 function addSmoke(pos, left) {
   const key = pos.map(v => Math.round(v * 2)).join(',');
   if (smokeClouds.has(key)) return;
+  // Пока облако густое, оно НЕпрозрачное: видеокарта рисует только ближний слой клубов, а не все 20+
+  // друг за другом (иначе в дыму FPS падал в разы). Прозрачное — только пока появляется и тает
   const mat = new THREE.MeshLambertMaterial({ color: 0xb9bdc3, transparent: true, opacity: 0, depthWrite: false });
   const mesh = new THREE.InstancedMesh(smokeGeo, mat, SMOKE_PUFFS);
   const puffs = [];
   for (let i = 0; i < SMOKE_PUFFS; i++) {
     const a = Math.random() * Math.PI * 2, r = 2.9 * Math.sqrt(Math.random());   // равномерно по кругу
     const p = { x: pos[0] + Math.cos(a) * r, y: 0.3 + Math.random() * 2.8, z: pos[2] + Math.sin(a) * r,
-      s: 0.38 + Math.random() * 0.3, cut: -Infinity };
+      s: 0.45 + Math.random() * 0.3, cut: -Infinity };
     puffs.push(p);
     mesh.setMatrixAt(i, _smokeM.compose(_smokeP.set(p.x, p.y, p.z), _smokeQ, _smokeS.setScalar(p.s)));
   }
@@ -2596,7 +2598,14 @@ function updateSmokes(now) {
   for (const [key, c] of smokeClouds) {
     // плавно густеет за 1 с и тает за последние 2 с
     const appear = Math.min(1, (now - c.born) / 1000), fade = Math.min(1, (c.until - now) / 2000);
-    c.mat.opacity = 0.92 * Math.max(0, Math.min(appear, fade));
+    const op = Math.max(0, Math.min(appear, fade));
+    const solid = op >= 1;
+    if (c.mat.transparent === solid) {   // переключение прозрачности — материал пересобирается
+      c.mat.transparent = !solid;
+      c.mat.depthWrite = solid;
+      c.mat.needsUpdate = true;
+    }
+    c.mat.opacity = op;
     // дыры от пуль: пока есть затягивающиеся клубы — обновляем их размер
     if (now - c.cutAt < SMOKE_HOLD + SMOKE_REFILL + 100) {
       c.puffs.forEach((p, i) => {
