@@ -540,8 +540,13 @@ function finger(parent, pts, thick) {
   for (let i = 0; i < 3; i++) {
     const j = new THREE.Group();
     if (i === 0) {
-      j.position.copy(v[0]);
-      j.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(axis, dir[0], new THREE.Vector3().crossVectors(axis, dir[0])));
+      // основание пальца — отдельный узел с поворотом по фалангам; сгиб j.rotation.x — поверх него
+      // (иначе pose() затирал бы часть этого поворота, и палец, например большой, разгибался не туда)
+      const base = new THREE.Group();
+      base.position.copy(v[0]);
+      base.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(axis, dir[0], new THREE.Vector3().crossVectors(axis, dir[0])));
+      host.add(base);
+      host = base;
     } else {
       j.position.y = len[i - 1];
       j.rotation.x = rest[i - 1];
@@ -585,7 +590,8 @@ function buildGripHand(trigger = true) {
     h.add(box(0.012, 0.016, 0.014, pad, 0.04, 0.036, -0.03));
   }
   // большой палец — от мякоти ладони огибает рукоять сзади и ложится поперёк указательного и среднего
-  fingers.thumb = finger(h, [[0.016, 0.006, 0.026], [-0.01, 0.016, 0.028], [-0.03, 0.022, 0.012], [-0.04, 0.02, -0.012]], 0.021);
+  // (все четыре точки — в одной плоскости: палец гнётся только в ней)
+  fingers.thumb = finger(h, [[0.016, 0.006, 0.026], [-0.01, 0.016, 0.028], [-0.03, 0.022, 0.012], [-0.038, 0.0227, -0.012]], 0.021);
   return h;
 }
 // Левая кисть поддерживает цевьё снизу: ладонь под ним, пальцы поднимаются по правому боку (+x),
@@ -678,7 +684,7 @@ function updateArms(vm) {
     for (const m of Object.values(parts)) m.visible = visible;
     if (!visible) continue;
     // поворот кисти относительно обычной позы
-    if (side === 'right') _q.copy(ud.rightGlove.quaternion).multiply(ud.kqInv ?? _I);
+    if (side === 'right') _q.copy(ud.rightGlove.quaternion).multiply(ud.gqInv ?? _I);
     else _q.copy(ud.leftArm.quaternion);
     const turned = ARM_DIR[side].clone().applyQuaternion(_q);
     const dir = ARM_DIR[side].clone().lerp(turned, 0.5).normalize();
@@ -865,6 +871,10 @@ function buildKnife(type, g) {
 // Как нож лежит в руке в покое: наклоны и место на экране
 const KNIFE_POSE = { rx: 0.15, ry: 0.8, roll: -0.15, hip: [0.18, -0.15, -0.42] };
 const HANDLE_Z = 0.06;  // середина рукояти (в координатах ножа) — там кулак
+const KARAMBIT_GRIP_Z = 0.1;  // у керамбита кулак ближе к кольцу — указательный палец проходит сквозь него
+// керамбит стоит в кулаке, как пистолетная рукоять: кисть почти не повёрнута, иначе предплечье уходит вбок
+// кулак у керамбита выше середины ножа (у кольца), поэтому вся модель опущена — кулак там же, где у других ножей
+const KARAMBIT_POSE = { rx: 0.1, ry: 0.4, roll: -0.1, hip: [0.16, -0.25, -0.44] };
 
 function buildKnifeViewModel(type) {
   const g = new THREE.Group();
@@ -872,10 +882,11 @@ function buildKnifeViewModel(type) {
   // spin — точка, вокруг которой нож крутится: у керамбита это кольцо, у остальных середина рукояти
   // tilt — наклон всего ножа в кулаке (осмотр клинка), вращается вокруг середины рукояти
   const pivotZ = type === 'karambit' ? 0.132 : 0.06;
+  const gripZ = type === 'karambit' ? KARAMBIT_GRIP_Z : HANDLE_Z;  // где кулак — вокруг этой точки и наклон
   const tilt = new THREE.Group();
-  tilt.position.z = HANDLE_Z;
+  tilt.position.z = gripZ;
   const tiltInner = new THREE.Group();
-  tiltInner.position.z = -HANDLE_Z;
+  tiltInner.position.z = -gripZ;
   tilt.add(tiltInner);
   const spin = new THREE.Group();
   spin.position.z = pivotZ;
@@ -883,21 +894,33 @@ function buildKnifeViewModel(type) {
   body.position.z = -pivotZ;
   spin.add(body);
   tiltInner.add(spin);
-  k.add(tilt);
+  // orient — как нож лежит в кулаке. Обычно рукоять вдоль руки, клинок вперёд.
+  // Керамбит держат иначе: рукоять стоит в кулаке, кольцо сверху — в нём указательный палец,
+  // клинок выходит снизу из-под мизинца и загибается вперёд
+  const orient = new THREE.Group();
+  if (type === 'karambit') orient.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, Math.PI, 0, 'YXZ'));
+  orient.add(tilt);
+  k.add(orient);
   Object.assign(g.userData, buildKnife(type, body), { spin, tilt, knifeType: type });
   k.scale.setScalar(1.5);
   // Порядок YXZ: нож чуть поворачивается вокруг своей длины, кончик — немного вверх (x)
   // и к центру экрана (y), так что плоская сторона клинка видна
-  k.rotation.set(KNIFE_POSE.rx, KNIFE_POSE.ry, KNIFE_POSE.roll, 'YXZ');
+  const pose = type === 'karambit' ? KARAMBIT_POSE : KNIFE_POSE;
+  k.rotation.set(pose.rx, pose.ry, pose.roll, 'YXZ');
   g.add(k);
-  // кисть — точно на середине рукояти и повёрнута вместе с ножом, чтобы обхватывать его
-  const handle = new THREE.Vector3(0, 0, HANDLE_Z * 1.5).applyEuler(k.rotation);
+  // кисть — на рукояти (у керамбита ближе к кольцу) и повёрнута вместе с ножом, чтобы обхватывать его
+  const rest = k.quaternion.clone().multiply(orient.quaternion);
+  const handle = new THREE.Vector3(0, 0, gripZ * 1.5).applyQuaternion(rest);
   addArms(g, handle.toArray(), null, { gripAxis: 'z', trigger: false });
-  g.userData.rightGlove.rotation.copy(k.rotation);
-  g.userData.kq = k.quaternion.clone();             // поворот ножа в покое
-  g.userData.kqInv = k.quaternion.clone().invert();
+  // у керамбита кисть держит рукоять как пистолетную (рукоять стоит), а не вдоль руки
+  if (type === 'karambit') g.userData.rightGlove.children[0].quaternion.identity();
+  g.userData.rightGlove.quaternion.copy(k.quaternion);
+  g.userData.kq = rest.clone();                     // поворот ножа в покое
+  g.userData.kqInv = rest.clone().invert();
+  g.userData.oInv = orient.quaternion.clone().invert();  // кулак = нож без orient
+  g.userData.gqInv = k.quaternion.clone().invert();     // поворот кулака в покое (обратный) — для руки
   g.userData.muzzle = new THREE.Object3D();
-  g.userData.hip = new THREE.Vector3(...KNIFE_POSE.hip);
+  g.userData.hip = new THREE.Vector3(...(pose.hip || KNIFE_POSE.hip));
   g.position.copy(g.userData.hip);
   g.scale.setScalar(0.85);
   g.visible = false;
@@ -3244,7 +3267,7 @@ function standUp(p, amount, turn) {
   _qUp.setFromUnitVectors(BLADE_DIR, up);
   _qTurn.setFromAxisAngle(up, turn).multiply(_qUp);
   p.tilt.quaternion.identity().slerp(_qTurn, amount);
-  p.rightGlove.quaternion.copy(p.kq).multiply(p.tilt.quaternion);  // кулак поворачивается с ножом
+  p.rightGlove.quaternion.copy(p.kq).multiply(p.tilt.quaternion).multiply(p.oInv);  // кулак поворачивается с ножом
   return { px: -0.1 * amount, py: -0.01 * amount, pz: -0.1 * amount };  // к центру и чуть дальше, чтобы клинок целиком в кадре
 }
 // t: 0–0.18 поднять, 0.2–0.72 разглядывать (поворот от -50° до +50°), 0.78–0.95 вернуть
@@ -3281,13 +3304,16 @@ const KNIFE_ANIMS = {
       fingers(p, { index: -0.15 * open, middle: 0.85 * open, ring: 0.9 * open, pinky: 0.95 * open, thumb: 0.8 * open });
       return raise(seg(t, 0, 0.4));
     } },
-    // разглядывает клинок, потом крутит на кольце, возвращая в руку
+    // кисть подносит нож ближе и поворачивает то одной, то другой стороной клинка (нож стоит в кулаке,
+    // поэтому поворачивается вся кисть), большой палец гладит рукоять; в конце — оборот на кольце
     inspect: { time: 3.2, fn: (t, p) => {
       p.spin.rotation.x = -ease(seg(t, 0.8, 0.98)) * TAU;
-      const pose = bladeView(t, p);
+      const look = ease(seg(t, 0, 0.15)) * (1 - ease(seg(t, 0.7, 0.8)));
+      const turn = -0.25 + 1.15 * ease(seg(t, 0.15, 0.68));  // сильнее назад нельзя — рука заслоняет экран
+      fingers(p, { thumb: 0.4 * Math.abs(Math.sin(Math.PI * 2 * seg(t, 0.2, 0.6))) });
       const open = bump(t, 0.77, 0.99);
       if (open > 0) fingers(p, { index: -0.15 * open, middle: 0.85 * open, ring: 0.9 * open, pinky: 0.95 * open, thumb: 0.8 * open });
-      return pose;
+      return scalePose({ ry: turn, rz: 0.3, rx: -0.15, px: -0.04, py: -0.01, pz: 0.03 }, look);
     } },
     // удар крюком снизу вверх
     slash: { time: 0.32, fn: (t, p) => {
@@ -3443,7 +3469,7 @@ function drawWeapon() {
 function restParts(ud) {
   if (ud.bolt) ud.bolt.position.z = ud.boltRest;
   if (ud.spin) ud.spin.rotation.set(0, 0, 0);
-  if (ud.tilt) { ud.tilt.quaternion.identity(); ud.rightGlove.quaternion.copy(ud.kq); }
+  if (ud.tilt) { ud.tilt.quaternion.identity(); ud.rightGlove.quaternion.copy(ud.kq).multiply(ud.oInv); }
   if (ud.blade) ud.blade.rotation.x = 0;
   if (ud.halfB) ud.halfB.rotation.x = 0;
   if (ud.mag) { ud.mag.position.copy(ud.magRest); ud.mag.rotation.set(ud.magRot, 0, 0); ud.mag.visible = true; }
@@ -5627,6 +5653,7 @@ showMenuAgent(settings.agent, 'rifle');
 if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startInspect, viewModels, knifeAttack, switchWeapon, setKnifeModel, playAnim, KNIFE_POSE, tick,
   setScope: v => { scope = v; }, throwNade, inv, aimbot, showMatchSummary, renderer, scene, socialSend, wallet,
   openInspect, closeInspect, renderInspect, addSmoke, carveSmokes, onKill,
+  useKnife(t) { myKnife = t; setKnifeModel(t); },  // взять в руки нож другого типа
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
   showVM(kind, name, t, bare) {
@@ -5645,6 +5672,7 @@ if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startI
       vm.rotation.set(pose.rx || 0, pose.ry || 0, pose.rz || 0);
     }
     updateArms(vm);
+    return vm;
   },
   // поставить камеру осмотра: dbg.view(поворот, наклон, расстояние) — модель перестаёт крутиться
   view(yaw, pitch, dist) { Object.assign(ins, { yaw, pitch, dist, touched: Infinity }); renderInspect(); },
