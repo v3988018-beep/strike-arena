@@ -810,16 +810,24 @@ function buildKnife(type, g) {
     g.add(profile([[0, 0.013], [0.05, 0.009], [0.09, -0.012], [0.115, -0.045], [0.12, -0.08],
                    [0.103, -0.052], [0.078, -0.028], [0.045, -0.014], [0, -0.013]], 0.006, steel));
   } else if (type === 'butterfly') {
-    // две половинки рукояти с прорезями и тонкий клинок; клинок и одна половинка — на шарнире
-    const half = side => {
-      const m = profile([[-0.13, -0.013], [0, -0.013], [0, 0.013], [-0.13, 0.013]], 0.008, dark,
-        [[[-0.112, -0.004], [-0.02, -0.004], [-0.02, 0.004], [-0.112, 0.004]]]);
-      m.position.x = side * 0.0085;
-      return m;
-    };
-    g.add(half(-1));
-    parts.halfB = hinge(g, half(1), box(0.026, 0.008, 0.012, steel, 0, -0.01, 0.135));  // с защёлкой
-    parts.blade = hinge(g, profile([[0, -0.01], [0.13, -0.008], [0.168, 0.004], [0.12, 0.013], [0, 0.013]], 0.006, steel));
+    // Как настоящая: две ручки крепятся к хвостовику клинка на двух осях — верхняя (u = +PIN) и нижняя (u = -PIN).
+    // Раскрыта — ручки сложены сверху и снизу в одну рукоять; сложена — каждая повёрнута на пол-оборота
+    // вокруг своей оси, и клинок лежит между ними. Верхняя ручка в кулаке неподвижна; клинок поворачивается
+    // вокруг её оси (parts.blade), нижняя ручка — вокруг своей оси на клинке (parts.halfB).
+    const PIN = 0.0085;
+    const handle = (u0, u1) => profile([[-0.13, u0], [0.006, u0], [0.006, u1], [-0.13, u1]], 0.018, dark,
+      [[[-0.11, u0 + 0.004], [-0.02, u0 + 0.004], [-0.02, u1 - 0.004], [-0.11, u1 - 0.004]]]);  // прорезь
+    const pin = y => box(0.022, 0.004, 0.004, steel, 0, y, 0);  // головки осей с боков
+    g.add(handle(0.0005, 0.013), pin(PIN));
+    const blade = profile([[-0.004, -0.012], [0.13, -0.009], [0.168, 0.003], [0.12, 0.012], [-0.004, 0.012]], 0.005, steel);
+    blade.position.y = -PIN;
+    parts.blade = hinge(g, blade);
+    parts.blade.position.y = PIN;
+    // нижняя ручка: шарнир на клинке в точке u = -PIN (внутри шарнира всё сдвинуто на +PIN обратно)
+    const low = handle(-0.013, -0.0005);
+    low.position.y = PIN;
+    parts.halfB = hinge(parts.blade, low, pin(0), box(0.022, 0.006, 0.012, steel, 0, PIN - 0.007, 0.135));  // с защёлкой
+    parts.halfB.position.y = -2 * PIN;
   } else if (type === 'skeleton') {
     // рукоять-рамка с вырезом и кольцо
     g.add(profile([[-0.115, -0.016], [0, -0.016], [0, 0.018], [-0.115, 0.016]], 0.02, black,
@@ -3210,12 +3218,13 @@ function flick(p, t, k, speed = 38) {
     ring: k * (0.5 + 0.4 * Math.sin(t * speed - 2.4)), pinky: k * 0.6, thumb: k * (0.5 + 0.5 * Math.sin(t * speed + 1.6)),
   });
 }
-// Взмах бабочки на отрезке [a, b]: клинок из положения from в to, свободная половинка отходит и возвращается,
+// Взмах бабочки на отрезке [a, b]: клинок из положения from в to (поворот вокруг оси верхней ручки),
+// нижняя ручка поворачивается вокруг своей оси на столько же — относительно кулака делает полный оборот,
 // пальцы плавно приоткрываются (указательный держит), в конце кулак сжимается — поймал рукоять
 function butterflyFlip(p, t, a, b, from, to) {
   const u = ease(seg(t, a, b));
   setBlade(p, from + (to - from) * u);
-  p.halfB.rotation.x = -2.4 * Math.sin(Math.PI * u);
+  p.halfB.rotation.x = p.blade.rotation.x;
   const loose = bump(t, a - 0.04, b), grip = bump(t, b - 0.04, b + 0.08);
   fingers(p, { index: 0.15 * loose - 0.15 * grip, middle: 0.5 * loose - 0.2 * grip, ring: 0.6 * loose - 0.2 * grip,
     pinky: 0.7 * loose - 0.2 * grip, thumb: 0.45 * loose - 0.15 * grip });
@@ -5619,9 +5628,10 @@ if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startI
   openInspect, closeInspect, renderInspect, addSmoke, carveSmokes, onKill,
   // показать модель «оружие + руки» крупно в окне 3D-осмотра (для проверки кистей)
   // name, t — показать кадр анимации (например 'reload', 0.4)
-  showVM(kind, name, t) {
+  showVM(kind, name, t, bare) {
     openInspect('rifle');
     const vm = (KNIVES[kind] ? buildKnifeViewModel(kind) : buildViewModel(kind));
+    if (bare) vm.children.slice(1).forEach(c => { c.visible = false; });  // bare — нож без рук
     vm.visible = true;
     vm.position.set(0, 0, 0);
     ins.pivot.clear();
