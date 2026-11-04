@@ -567,9 +567,10 @@ function finger(parent, pts, thick) {
 function buildGripHand(trigger = true) {
   const h = new THREE.Group();
   const { glove, pad, strap } = HAND_MAT;
-  h.add(box(0.026, 0.085, 0.07, glove, 0.033, -0.005, 0.004));     // ладонь
-  h.add(box(0.008, 0.07, 0.05, pad, 0.048, 0, -0.004));            // накладка на тыльной стороне
-  h.add(box(0.062, 0.04, 0.062, strap, 0.022, -0.05, 0.042, -0.3)); // манжета-липучка
+  h.add(box(0.03, 0.084, 0.07, glove, 0.031, -0.004, 0.006));      // ладонь (от костяшек к запястью)
+  h.add(box(0.008, 0.066, 0.046, pad, 0.048, 0, -0.002));          // накладка на тыльной стороне
+  h.add(box(0.024, 0.04, 0.034, glove, 0.012, -0.022, 0.026));     // мякоть ладони у запястья (под большим пальцем)
+  h.add(box(0.034, 0.012, 0.03, strap, 0.034, -0.04, 0.03));       // липучка на запястье — тонкий ремешок
   // средний, безымянный, мизинец: от костяшек вперёд, вокруг рукояти, кончики слева
   const fingers = h.userData.fingers = {};
   const names = trigger ? ['middle', 'ring', 'pinky'] : ['index', 'middle', 'ring', 'pinky'];
@@ -583,8 +584,8 @@ function buildGripHand(trigger = true) {
     fingers.index = finger(h, [[0.034, 0.036, -0.026], [0.03, 0.044, -0.056], [0.02, 0.046, -0.078], [0.006, 0.04, -0.09]], 0.018);
     h.add(box(0.012, 0.016, 0.014, pad, 0.04, 0.036, -0.03));
   }
-  // большой палец — по левой стороне вверх и вперёд
-  fingers.thumb = finger(h, [[0.02, 0.0, 0.02], [-0.012, 0.022, 0.018], [-0.03, 0.036, 0.0], [-0.034, 0.042, -0.02]], 0.021);
+  // большой палец — от мякоти ладони огибает рукоять сзади и ложится поперёк указательного и среднего
+  fingers.thumb = finger(h, [[0.016, 0.006, 0.026], [-0.01, 0.016, 0.028], [-0.03, 0.022, 0.012], [-0.04, 0.02, -0.012]], 0.021);
   return h;
 }
 // Левая кисть поддерживает цевьё снизу: ладонь под ним, пальцы поднимаются по правому боку (+x),
@@ -5631,7 +5632,8 @@ if (location.search.includes('debug')) window.dbg = { me, shoot, remotes, startI
   showVM(kind, name, t, bare) {
     openInspect('rifle');
     const vm = (KNIVES[kind] ? buildKnifeViewModel(kind) : buildViewModel(kind));
-    if (bare) vm.children.slice(1).forEach(c => { c.visible = false; });  // bare — нож без рук
+    if (bare === 'hand') vm.children[0].visible = false;                   // только руки
+    else if (bare) vm.children.slice(1).forEach(c => { c.visible = false; });  // bare — нож без рук
     vm.visible = true;
     vm.position.set(0, 0, 0);
     ins.pivot.clear();
